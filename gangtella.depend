@@ -1,0 +1,249 @@
+# depslib dependency file v1.0
+1401355266 source:/home/luk2010/Projects/gangtella/main.cpp
+	"prerequesites.h"
+	"packet.h"
+	"client.h"
+	"server.h"
+
+1401869942 
+
+1401355317 /home/luk2010/Projects/gangtella/prerequesites.h
+	<unistd.h>
+	<typeinfo>
+	<fstream>
+	<iostream>
+	<errno.h>
+	<string>
+	<cstring>
+	<cstdio>
+	<vector>
+	<signal.h>
+	<time.h>
+	<pthread.h>
+	<stdio.h>
+	<stdlib.h>
+	<winsock2.h>
+	<sys/types.h>
+	<sys/socket.h>
+	<netinet/in.h>
+	<arpa/inet.h>
+	<netdb.h>
+	"serializer.h"
+
+1401869463 r.h"
+
+1401301965 /home/luk2010/Projects/gangtella/packet.h
+	"prerequesites.h"
+
+1401869024 ites.h"
+
+1401118403 /home/luk2010/Projects/gangtella/client.h
+	"prerequesites.h"
+
+1400836924 /home/luk2010/Projects/gangtella/server.h
+	"prerequesites.h"
+	"client.h"
+
+1401302207 source:/home/luk2010/Projects/gangtella/packet.cpp
+	"packet.h"
+
+1401304050 source:/home/luk2010/Projects/gangtella/client.cpp
+	"packet.h"
+	"client.h"
+
+1401302285 source:/home/luk2010/Projects/gangtella/server.cpp
+	"prerequesites.h"
+	"server.h"
+	"packet.h"
+
+1401125219 source:/home/luk2010/Projects/gangtella/prerequesites.cpp
+	"prerequesites.h"
+
+1401355287 /home/luk2010/Projects/gangtella/serializer.h
+	"prerequesites.h"
+
+1401304647 source:/home/luk2010/Projects/gangtella/serializer.cpp
+	"serializer.h"
+
+1401304050 source:g:\gangtella\client.cpp
+	"packet.h"
+	"client.h"
+
+1401301964 g:\gangtella\packet.h
+	"prerequesites.h"
+
+1401355316 g:\gangtella\prerequesites.h
+	<unistd.h>
+	<typeinfo>
+	<fstream>
+	<iostream>
+	<errno.h>
+	<string>
+	<cstring>
+	<cstdio>
+	<vector>
+	<signal.h>
+	<time.h>
+	<pthread.h>
+	<stdio.h>
+	<stdlib.h>
+	<winsock2.h>
+	<sys/types.h>
+	<sys/socket.h>
+	<netinet/in.h>
+	<arpa/inet.h>
+	<netdb.h>
+	"serializer.h"
+
+1401355286 g:\gangtella\serializer.h
+	"prerequesites.h"
+
+1401118402 g:\gangtella\client.h
+	"prerequesites.h"
+
+1401355322 source:g:\gangtella\main.cpp
+	"prerequesites.h"
+	"packet.h"
+	"client.h"
+	"server.h"
+
+1400836924 g:\gangtella\server.h
+	"prerequesites.h"
+	"client.h"
+
+1401302206 source:g:\gangtella\packet.cpp
+	"packet.h"
+
+1401125218 source:g:\gangtella\prerequesites.cpp
+	"prerequesites.h"
+
+1401304646 source:g:\gangtella\serializer.cpp
+	"serializer.h"
+
+1401302284 source:g:\gangtella\server.cpp
+	"prerequesites.h"
+	"server.h"
+	"packet.h"
+
+1401869232 source:c:\users\luk2010\documents\projects\gangtella\client.cpp
+	"packet.h"
+	"client.h"
+
+1401869339 c:\users\luk2010\documents\projects\gangtella\packet.h
+	"prerequesites.h"
+
+1401871148 c:\users\luk2010\documents\projects\gangtella\prerequesites.h
+	<unistd.h>
+	<typeinfo>
+	<fstream>
+	<iostream>
+	<errno.h>
+	<string>
+	<cstring>
+	<cstdio>
+	<vector>
+	<signal.h>
+	<time.h>
+	<pthread.h>
+	<stdio.h>
+	<stdlib.h>
+	<windows.h>
+	<winsock2.h>
+	<sys/types.h>
+	<sys/socket.h>
+	<netinet/in.h>
+	<arpa/inet.h>
+	<netdb.h>
+	"serializer.h"
+
+1401869453 c:\users\luk2010\documents\projects\gangtella\serializer.h
+	"prerequesites.h"
+
+1401118402 c:\users\luk2010\documents\projects\gangtella\client.h
+	"prerequesites.h"
+
+1401869411 source:c:\users\luk2010\documents\projects\gangtella\main.cpp
+	"prerequesites.h"
+	"packet.h"
+	"client.h"
+	"server.h"
+
+1401869312 c:\users\luk2010\documents\projects\gangtella\server.h
+	"prerequesites.h"
+	"client.h"
+
+1401869024 source:c:\users\luk2010\documents\projects\gangtella\prerequesites.cpp
+	"prerequesites.h"
+
+1401869463 source:c:\users\luk2010\documents\projects\gangtella\serializer.cpp
+	"serializer.h"
+
+1401867229 source:c:\users\luk2010\documents\projects\gangtella\server.cpp
+	"prerequesites.h"
+	"server.h"
+	"packet.h"
+
+1401869942 source:c:\users\luk2010\documents\projects\gangtella\packet.cpp
+	"packet.h"
+
+1401870356 source:/media/luk2010/8E70A4D370A4C2F7/Users/Luk2010/Documents/Projects/gangtella/client.cpp
+	"packet.h"
+	"client.h"
+
+1401869339 /media/luk2010/8E70A4D370A4C2F7/Users/Luk2010/Documents/Projects/gangtella/packet.h
+	"prerequesites.h"
+
+1402852892 /media/luk2010/8E70A4D370A4C2F7/Users/Luk2010/Documents/Projects/gangtella/prerequesites.h
+	<unistd.h>
+	<typeinfo>
+	<fstream>
+	<iostream>
+	<errno.h>
+	<string>
+	<cstring>
+	<cstdio>
+	<vector>
+	<signal.h>
+	<time.h>
+	<pthread.h>
+	<stdio.h>
+	<stdlib.h>
+	<windows.h>
+	<winsock2.h>
+	<sys/types.h>
+	<sys/socket.h>
+	<netinet/in.h>
+	<arpa/inet.h>
+	<netdb.h>
+	"serializer.h"
+
+1401869453 /media/luk2010/8E70A4D370A4C2F7/Users/Luk2010/Documents/Projects/gangtella/serializer.h
+	"prerequesites.h"
+
+1401118402 /media/luk2010/8E70A4D370A4C2F7/Users/Luk2010/Documents/Projects/gangtella/client.h
+	"prerequesites.h"
+
+1401869942 source:/media/luk2010/8E70A4D370A4C2F7/Users/Luk2010/Documents/Projects/gangtella/packet.cpp
+	"packet.h"
+
+1401869463 source:/media/luk2010/8E70A4D370A4C2F7/Users/Luk2010/Documents/Projects/gangtella/serializer.cpp
+	"serializer.h"
+
+1402852936 source:/media/luk2010/8E70A4D370A4C2F7/Users/Luk2010/Documents/Projects/gangtella/main.cpp
+	"prerequesites.h"
+	"packet.h"
+	"client.h"
+	"server.h"
+
+1402853002 /media/luk2010/8E70A4D370A4C2F7/Users/Luk2010/Documents/Projects/gangtella/server.h
+	"prerequesites.h"
+	"client.h"
+
+1402852890 source:/media/luk2010/8E70A4D370A4C2F7/Users/Luk2010/Documents/Projects/gangtella/prerequesites.cpp
+	"prerequesites.h"
+
+1402853493 source:/media/luk2010/8E70A4D370A4C2F7/Users/Luk2010/Documents/Projects/gangtella/server.cpp
+	"prerequesites.h"
+	"server.h"
+	"packet.h"
+

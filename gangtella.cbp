@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="gangtella" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="WIN_DEBUG">
+				<Option platforms="Windows;" />
+				<Option output="bin/win/debug/gangtella" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="bin/win/debug" />
+				<Option object_output=".objs/win/debug" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-g" />
+					<Add option="-D_WIN32" />
+				</Compiler>
+				<Linker>
+					<Add option="-lws2_32" />
+				</Linker>
+			</Target>
+			<Target title="WIN_RELEASE">
+				<Option platforms="Windows;" />
+				<Option output="bin/win/release/gangtella" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="bin/win/release" />
+				<Option object_output=".objs/win/release" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O2" />
+					<Add option="-D_WIN32" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+					<Add option="-lws2_32" />
+				</Linker>
+			</Target>
+			<Target title="LINUX_DEBUG">
+				<Option platforms="Unix;" />
+				<Option output="bin/linux/debug/gangtella" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="bin/linux/debug" />
+				<Option object_output=".objs/linux/debug" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-g" />
+					<Add option="-D_LINUX" />
+				</Compiler>
+			</Target>
+			<Target title="LINUX_RELEASE">
+				<Option platforms="Unix;" />
+				<Option output="bin/linux/release/gangtella" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="bin/linux/release" />
+				<Option object_output=".objs/linux/release" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-D_LINUX" />
+				</Compiler>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-std=c++11" />
+			<Add option="-Wall" />
+			<Add option="-fexceptions" />
+			<Add option="-D_REENTRANT" />
+		</Compiler>
+		<Linker>
+			<Add option="-lpthread" />
+		</Linker>
+		<Unit filename="client.cpp" />
+		<Unit filename="client.h" />
+		<Unit filename="main.cpp" />
+		<Unit filename="packet.cpp" />
+		<Unit filename="packet.h" />
+		<Unit filename="prerequesites.cpp" />
+		<Unit filename="prerequesites.h" />
+		<Unit filename="serializer.cpp" />
+		<Unit filename="serializer.h" />
+		<Unit filename="server.cpp" />
+		<Unit filename="server.h" />
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<lib_finder disable_auto="1" />
+			<debugger />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

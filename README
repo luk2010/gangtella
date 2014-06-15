@@ -1,0 +1,22 @@
+The GangTella Project
+---------------------
+
+Copyright @luk2010, 2014
+
+The GangTella project is a new type of connection, where every connection
+have a mirror which pointes directly to the client. These connections are secure, 
+and relatively fast. 
+It uses the TCP/IP protocol and it creates a higher level protocol with packets. 
+Serialization is handled by a minimal code. 
+
+This project can be used to chat with people you like without using any messenger 
+or full-of-popup things, you can share files without needing something special.
+
+Currently supported platforms : 
+* Windows XP/Vista/7/8
+* Linux
+
+Libraries needed :
+* pthread
+* A correct socket implementation (posix or WSA) 
+

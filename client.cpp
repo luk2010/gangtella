@@ -3,6 +3,7 @@
 */
 #include "packet.h"
 #include "client.h"
+#include "server.h"
 
 GBEGIN_DECL
 
@@ -54,15 +55,8 @@ gerror_t client_create(client_t* client, const char* adress, size_t port)
     std::cout << "[Client] Name = '" << client->name << "'." << std::endl;
     client->sock    = sock;
     client->address = sin;
-    client->mirror  = NULL;
-    client->server  = NULL;
 
-#ifdef GULTRA_DEBUG
-    std::cout << "[Client] Sending Name to host." << std::endl;
-#endif // GULTRA_DEBUG
-
-    // On connection, server expects name of this client to be send.
-    return client_send_packet(client, PT_CLIENT_NAME, client->name.c_str(), client->name.size());
+    return GERROR_NONE;
 }
 
 gerror_t client_send_packet(client_t* client, uint8_t packet_type, const void* data, size_t sz)
@@ -92,6 +86,57 @@ gerror_t client_close(client_t* client, bool send_close_packet)
 #endif // GULTRA_DEBUG
 
     return ret;
+}
+
+gerror_t client_send_cryptpacket(client_t* client, uint8_t packet_type, const void* data, size_t sz)
+{
+    // First we have to create the EncryptionInfoPacket
+
+    server_t* server = (server_t*) client->server;
+    encrypted_info_t info;
+    info.ptype                    = packet_type;
+    info.cryptedblock_number.data = (sz / (RSA_SIZE - 11) ) + 1;
+    info.cryptedblock_lastsz.data = sz % (RSA_SIZE - 11);
+
+    // We send the info to client
+    info = serialize<encrypted_info_t>(info);
+    client_send_packet(client, PT_ENCRYPTED_INFO, &info, sizeof(encrypted_info_t));
+    info = deserialize<encrypted_info_t>(info);
+
+    if(info.cryptedblock_number.data > 1)
+    {
+        // We have to send many crypted chunk
+        unsigned char* chunk   = reinterpret_cast<unsigned char*>(const_cast<void*>(data));
+        unsigned char* current = nullptr;
+        unsigned char* to      = (unsigned char*) malloc(RSA_SIZE);
+        unsigned int i = 0;
+        for (; i < info.cryptedblock_number.data - 1; ++i)
+        {
+            current = chunk + ( i * ( RSA_SIZE - 11 ) );
+            int len = Encryption::crypt(server->crypt, to, current, RSA_SIZE - 11);
+            client_send_packet(client, PT_ENCRYPTED_CHUNK, to, len);
+        }
+
+        current = chunk + ( i * ( RSA_SIZE - 11 ) );
+        int len = Encryption::crypt(server->crypt, to, current, info.cryptedblock_lastsz.data);
+        client_send_packet(client, PT_ENCRYPTED_CHUNK, to, len);
+
+        // Terminated !
+        free(to);
+        return GERROR_NONE;
+    }
+    else
+    {
+        // We have to send one crypted chunk
+        unsigned char* chunk = reinterpret_cast<unsigned char*>(const_cast<void*>(data));
+        unsigned char* to    = (unsigned char*) malloc(RSA_SIZE);
+
+        int len = Encryption::crypt(server->crypt, to, chunk, RSA_SIZE - 11);
+        client_send_packet(client, PT_ENCRYPTED_CHUNK, to, len);
+
+        // Terminated !
+        return GERROR_NONE;
+    }
 }
 
 gerror_t client_send_file(client_t* client, const char* filename)

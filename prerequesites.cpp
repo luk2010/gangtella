@@ -167,7 +167,14 @@ static const char* __errors [GERROR_MAX] = {
     "(Win) WSA can't start.",
     "Invalid binding of socket.",
     "Can't listen with given socket.",
-    "Error creating thread."
+    "Error creating thread.",
+    "Error locking mutex.",
+    "Error unlocking mutex.",
+    "(Win) WSA can't be cleaned.",
+    "Can't generate RSA key pair.",
+    "Error in BIO functions.",
+    "Error reading bio.",
+    "Error writing encryption."
 };
 
 const char* gerror_to_string(gerror_t& err)
@@ -177,6 +184,15 @@ const char* gerror_to_string(gerror_t& err)
         return __errors[idx];
     else
         return "";
+}
+
+gerror_t buffer_copy(buffer_t& dest, const buffer_t& src)
+{
+    dest.size = src.size;
+    if(src.size > 0)
+        memcpy(dest.buf, src.buf, src.size);
+
+    return GERROR_NONE;
 }
 
 GEND_DECL

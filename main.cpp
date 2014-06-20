@@ -22,6 +22,7 @@
 */
 
 #include "prerequesites.h"
+#include "commands.h"
 #include "packet.h"
 #include "client.h"
 #include "server.h"
@@ -53,7 +54,7 @@ void treat_command(const std::string& command)
                 client_t* to = server_find_client_by_name(&server, args[1]);
                 if(to != NULL && to->mirror != NULL)
                 {
-                    client_send_packet(to->mirror, PT_CLIENT_MESSAGE, command.c_str() + 8 + args[1].size() + 1, command.size() - 8 - args[1].size() - 1);
+                    client_send_cryptpacket(to->mirror, PT_CLIENT_MESSAGE, command.c_str() + 8 + args[1].size() + 1, command.size() - 8 - args[1].size() - 1);
                 }
             }
 
@@ -148,19 +149,28 @@ void treat_command(const std::string& command)
         {
             if(args.size() > 2)
             {
-                std::string name   = args[1];
-                std::string adress = args[2];
-                int         port   = atoi(args[3].c_str());
+                std::string adress = args[1];
+                int         port   = atoi(args[2].c_str());
 
-                client_t* new_client = server_init_client_connection(&server, name, adress.c_str(), port);
+                client_t* new_client = nullptr;
+                server_init_client_connection(&server, new_client, adress.c_str(), port);
                 if(!new_client)
-                    std::cout << "[Command] Can't initialize new client connection (adress='" << name << "', port=" << port << ")." << std::endl;
+                    std::cout << "[Command] Can't initialize new client connection (adress='" << adress << "', port=" << port << ")." << std::endl;
             }
 
             else
             {
-                std::cout << "[Command]<help> openclient [connection name] [IP adress] [port]" << std::endl;
+                std::cout << "[Command]<help> openclient [IP adress] [port]" << std::endl;
                 std::cout << "[Command]<help> Open a new connection to given adress and port." << std::endl;
+            }
+        }
+
+        else if(args[0] == "closeclient")
+        {
+            if(args.size() > 1)
+            {
+                std::string name = args[1];
+                server_end_client(&server, name);
             }
         }
     }
@@ -173,8 +183,10 @@ void display_help()
               << "you can send a mail to 'alain.ratatouille@gmail.com' (for suggestions it is the same adress :) ) . " << std::endl
               << "Uses : gangtella [options]" << std::endl
               << "Options : " << std::endl
-              << " --s-port      : Specify a custom port for the server."             << std::endl
+              << " --s-port      : Specify a custom port for the Server."             << std::endl
               << "                 Default is 8377."                                  << std::endl
+              << " --s-name      : Specify a custom name for the Server. This name "  << std::endl
+              << "                 shown to every one who connect to this server."    << std::endl
               << " --c-adress    : Specify the IP adress for the automated"           << std::endl
               << "                 created client. Default is 127.0.0.1 (for test)."  << std::endl
               << " --c-port      : Specify a port for the automated created client."  << std::endl
@@ -199,6 +211,7 @@ int main(int argc, char* argv[])
     // Argues
 
     int server_port           = SERVER_PORT;
+    std::string server_name   = "Default";
     std::string client_adress = "127.0.0.1";
     int client_port           = CLIENT_PORT;
     bool with_client          = false;
@@ -210,6 +223,11 @@ int main(int argc, char* argv[])
         if(std::string("--s-port") == argv[i])
         {
             server_port = atoi(argv[i+1]);
+            i++;
+        }
+        else if(std::string("--s-name") == argv[i])
+        {
+            server_name = argv[i+1];
             i++;
         }
         else if(std::string("--c-adress") == argv[i])
@@ -244,6 +262,7 @@ int main(int argc, char* argv[])
     }
 
 #ifdef GULTRA_DEBUG
+    std::cout << "[Main] Server Name   = '" << server_name << "'." << std::endl;
     std::cout << "[Main] Server Port   = '" << server_port << "'." << std::endl;
     if(with_client) {
     std::cout << "[Main] Client Adress = '" << client_adress << "'." << std::endl;
@@ -255,14 +274,14 @@ int main(int argc, char* argv[])
 
 #endif // GULTRA_DEBUG
 
-    server_create(&server);
+    server_create(&server, server_name);
     server_initialize(&server, server_port, server_max_clients);
 
     // Creation thread serveur
     std::cout << "[Main] Creating Server thread." << std::endl;
     if(server_launch(&server) != GERROR_NONE)
     {
-        std::cerr << "Couldn't launch server !!! Aborting." << std::endl;
+        std::cerr << "[Main] Couldn't launch server !!! Aborting." << std::endl;
         return 0;
     }
 
@@ -274,7 +293,7 @@ int main(int argc, char* argv[])
     if(with_client)
     {
         std::cout << "[Main] Initializing client." << std::endl;
-        server_init_client_connection(&server, "1", client_adress.c_str(), client_port);
+        client_t* tmp = nullptr; server_init_client_connection(&server, tmp, client_adress.c_str(), client_port);
     }
 
     // Waiting for client to be done

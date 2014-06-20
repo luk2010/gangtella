@@ -69,9 +69,14 @@
 		</Compiler>
 		<Linker>
 			<Add option="-lpthread" />
+			<Add option="-lcrypto" />
 		</Linker>
 		<Unit filename="client.cpp" />
 		<Unit filename="client.h" />
+		<Unit filename="commands.cpp" />
+		<Unit filename="commands.h" />
+		<Unit filename="encryption.cpp" />
+		<Unit filename="encryption.h" />
 		<Unit filename="main.cpp" />
 		<Unit filename="packet.cpp" />
 		<Unit filename="packet.h" />

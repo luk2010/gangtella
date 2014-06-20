@@ -38,6 +38,31 @@ typedef struct send_file_t send_file_t;
 template <> send_file_t serialize(const send_file_t&);
 template <> send_file_t deserialize(const send_file_t&);
 
+/** @brief A structure describing the client info needed by a server.
+**/
+struct client_info_t
+{
+    uint32_nt id;    // ID from mirror struct.
+    uint32_nt idret; // ID from client struct.
+    uint32_nt s_port;// Port for mirror struct.
+    char      name[SERVER_MAXBUFSIZE];
+    buffer_t  pubkey; // Public RSA Key.
+};
+
+template <> client_info_t serialize(const client_info_t&);
+template <> client_info_t deserialize(const client_info_t&);
+
+/** @brief Describe an encrypted info structure.
+**/
+struct encrypted_info_t {
+    uint8_t   ptype;               // Packet type of decrypted data
+    uint32_nt cryptedblock_number; // Number of crypted blocks.
+    uint32_nt cryptedblock_lastsz; // Size of last crypted block (once decrypted).
+};
+
+template <> encrypted_info_t serialize(const encrypted_info_t&);
+template <> encrypted_info_t deserialize(const encrypted_info_t&);
+
 /* ******************************************************************* */
 
 
@@ -50,7 +75,10 @@ typedef enum PacketType {
     PT_CLIENT_ESTABLISHED        = 5,
     PT_CLIENT_SENDFILE_INFO      = 6,
     PT_CLIENT_SENDFILE_CHUNK     = 7,
-    PT_CLIENT_SENDFILE_TERMINATE = 8
+    PT_CLIENT_SENDFILE_TERMINATE = 8,
+    PT_CLIENT_INFO               = 9,
+    PT_ENCRYPTED_INFO            = 10,
+    PT_ENCRYPTED_CHUNK           = 11
 } PacketType;
 
 class Packet {
@@ -61,56 +89,146 @@ public:
     virtual ~Packet() {}
 
     virtual size_t getMaxPacketSize() const { return 0; }
+    static size_t GetPacketSize()           { return 0; }
 };
 
-class PacketTypePacket : public Packet {
+template<PacketType Ptype>
+class PacketPolicy : public Packet
+{
+public:
+    PacketPolicy() {}
+    virtual ~PacketPolicy() {}
+};
+
+// ----------  PT_PACKETTYPE ------------
+
+template<>
+class PacketPolicy<PT_PACKETTYPE> : public Packet {
 public:
     uint8_t type;
 
-    PacketTypePacket() : type(PT_UNKNOWN) {}
-    ~PacketTypePacket() {}
-    size_t getMaxPacketSize() const { return sizeof(PacketTypePacket); }
+    PacketPolicy() : type(PT_UNKNOWN) { m_type = PT_PACKETTYPE; }
+    ~PacketPolicy() {}
+    size_t getMaxPacketSize() const { return sizeof(PacketPolicy<PT_PACKETTYPE>); }
+    static size_t GetPacketSize()   { return sizeof(PacketPolicy<PT_PACKETTYPE>); }
 };
+typedef PacketPolicy<PT_PACKETTYPE> PacketTypePacket;
 
-class ClientNamePacket : public Packet {
+// --------------------------------------
+
+// ---------  PT_CLIENT_NAME ------------
+
+template<>
+class PacketPolicy<PT_CLIENT_NAME> : public Packet {
 public:
     char buffer[SERVER_MAXBUFSIZE];
 
-    ClientNamePacket() { m_type = PT_CLIENT_NAME; }
-    ~ClientNamePacket() {}
+    PacketPolicy() { m_type = PT_CLIENT_NAME; }
+    ~PacketPolicy() {}
 
     size_t getMaxPacketSize() const { return SERVER_MAXBUFSIZE - 1; }
+    static size_t GetPacketSize()   { return SERVER_MAXBUFSIZE - 1; }
 };
+typedef PacketPolicy<PT_CLIENT_NAME> ClientNamePacket;
 
-class ClientMessagePacket : public Packet {
+// --------------------------------------
+
+// --------- PT_CLIENT_MESSAGE ----------
+
+template<>
+class PacketPolicy<PT_CLIENT_MESSAGE> : public Packet {
 public:
     char buffer[SERVER_MAXBUFSIZE];
 
-    ClientMessagePacket() { m_type = PT_CLIENT_MESSAGE; }
-    ~ClientMessagePacket() {}
+    PacketPolicy() { m_type = PT_CLIENT_MESSAGE; }
+    ~PacketPolicy() {}
 
     size_t getMaxPacketSize() const { return SERVER_MAXBUFSIZE - 1; }
+    static size_t GetPacketSize()   { return SERVER_MAXBUFSIZE - 1; }
 };
+typedef PacketPolicy<PT_CLIENT_MESSAGE> ClientMessagePacket;
 
-class ClientSendFileInfoPacket : public Packet {
+// --------------------------------------
+
+// ------ PT_CLIENT_SENDFILE_INFO -------
+
+template<>
+class PacketPolicy<PT_CLIENT_SENDFILE_INFO> : public Packet {
 public:
     struct send_file_t info;
 
-    ClientSendFileInfoPacket() { m_type = PT_CLIENT_SENDFILE_INFO; }
-    ~ClientSendFileInfoPacket() {}
+    PacketPolicy() { m_type = PT_CLIENT_SENDFILE_INFO; }
+    ~PacketPolicy() {}
 
     size_t getMaxPacketSize() const { return sizeof(struct send_file_t); }
+    static size_t GetPacketSize()   { return sizeof(struct send_file_t); }
 };
+typedef PacketPolicy<PT_CLIENT_SENDFILE_INFO> ClientSendFileInfoPacket;
 
-class ClientSendFileChunkPacket : public Packet {
+// --------------------------------------
+
+// ----- PT_CLIENT_SENDFILE_CHUNK -------
+
+template<>
+class PacketPolicy<PT_CLIENT_SENDFILE_CHUNK> : public Packet {
 public:
     char chunk[SERVER_MAXBUFSIZE];
 
-    ClientSendFileChunkPacket() { m_type = PT_CLIENT_SENDFILE_CHUNK; }
-    ~ClientSendFileChunkPacket() {}
+    PacketPolicy() { m_type = PT_CLIENT_SENDFILE_CHUNK; }
+    ~PacketPolicy() {}
 
     size_t getMaxPacketSize() const { return SERVER_MAXBUFSIZE; }
+    static size_t GetPacketSize()   { return SERVER_MAXBUFSIZE; }
 };
+typedef PacketPolicy<PT_CLIENT_SENDFILE_CHUNK> ClientSendFileChunkPacket;
+
+// --------------------------------------
+
+// ---------- PT_CLIENT_INFO ------------
+
+template<>
+class PacketPolicy<PT_CLIENT_INFO> : public Packet {
+public:
+    client_info_t info;
+
+    PacketPolicy() { m_type = PT_CLIENT_INFO; }
+    ~PacketPolicy() {}
+
+    size_t getMaxPacketSize() const { return sizeof(client_info_t); }
+    static size_t GetPacketSize()   { return sizeof(client_info_t); }
+};
+typedef PacketPolicy<PT_CLIENT_INFO> ClientInfoPacket;
+
+// --------------------------------------
+
+template<>
+class PacketPolicy<PT_ENCRYPTED_INFO> : public Packet {
+public:
+    encrypted_info_t info;
+
+    PacketPolicy() { m_type = PT_ENCRYPTED_INFO; }
+    ~PacketPolicy() {}
+
+    size_t getMaxPacketSize() const { return sizeof(encrypted_info_t); }
+    static size_t GetPacketSize()   { return sizeof(encrypted_info_t); }
+};
+typedef PacketPolicy<PT_ENCRYPTED_INFO> EncryptedInfoPacket;
+
+template<>
+class PacketPolicy<PT_ENCRYPTED_CHUNK> : public Packet {
+public:
+    unsigned char chunk[RSA_SIZE];
+
+    PacketPolicy() { m_type = PT_ENCRYPTED_CHUNK; }
+    ~PacketPolicy() {}
+
+    size_t getMaxPacketSize() const { return RSA_SIZE; }
+    static size_t GetPacketSize()   { return RSA_SIZE; }
+};
+typedef PacketPolicy<PT_ENCRYPTED_CHUNK> EncryptedChunkPacket;
+
+Packet* packet_choose_policy(const int type);
+Packet* packet_interpret(SOCKET sock, const uint8_t type, Packet* packet, unsigned char* data, size_t len);
 
 Packet* receive_client_packet(SOCKET sock, size_t min_packet_size = 0);
 gerror_t send_client_packet   (SOCKET sock, uint8_t packet_type, const void* data, size_t sz);

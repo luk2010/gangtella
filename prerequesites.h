@@ -45,6 +45,15 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <map>
+
+// Comment tis line if you do not want the encryption module.
+// THIS IS VERY RECOMMENDED TO KEEP IT
+#define GENCRYPT_RSA
+
+#ifdef GENCRYPT_RSA
+#   include <openssl/rsa.h>
+#endif // GENCRYPT_RSA
 
 /* ******************************************************************* */
 
@@ -115,6 +124,7 @@ STATIC_ASSERT(sizeof(double)   == 8, invalid_double_size);
 #define SERVER_PORT          8378 // Where other client will connect
 #define SERVER_MAXCLIENTS    10
 #define SERVER_MAXBUFSIZE    1024
+#define RSA_SIZE             256  // Size of chunk in RSA. Data must be 256 - 11 size.
 
 #define GULTRA_DEBUG         1    // Define this if you want every debug things.
 
@@ -150,8 +160,15 @@ typedef enum GError
     GERROR_INVALID_BINDING   = 11,
     GERROR_INVALID_LISTENING = 12,
     GERROR_THREAD_CREATION   = 13,
+    GERROR_MUTEX_LOCK        = 14,
+    GERROR_MUTEX_UNLOCK      = 15,
+    GERROR_WSACLEANING       = 16,
+    GERROR_ENCRYPT_GENERATE  = 17,
+    GERROR_ENCRYPT_BIO       = 18,
+    GERROR_ENCRYPT_BIOREAD   = 19,
+    GERROR_ENCRYPT_WRITE     = 20,
 
-    GERROR_MAX               = 14  // Number of errors
+    GERROR_MAX               = 21  // Number of errors
 } GError;
 typedef int gerror_t;
 
@@ -178,6 +195,14 @@ printf("Variance = %f, Time taken (nanoseconds): %ld\n", variance, time_elapsed_
 
 bool gthread_mutex_lock(pthread_mutex_t* mutex);
 bool gthread_mutex_unlock(pthread_mutex_t* mutex);
+
+// A standard buffer
+typedef struct {
+    unsigned char   buf[SERVER_MAXBUFSIZE];
+    size_t size;
+} buffer_t;
+
+gerror_t buffer_copy(buffer_t& dest, const buffer_t& src);
 
 GEND_DECL
 

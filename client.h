@@ -9,14 +9,25 @@
 
 GBEGIN_DECL
 
+
+/** @brief represents a one-way connection.
+ *  There are always two ways to represent a connection on a server :
+ *  - The server-to-client connection wich represents the first client.
+ *  - The client-to-server connection wichh represents the mirror client.
+ *
+ *  client : server <------- client
+ *  mirror : server -------> client
+**/
 typedef struct _client_ {
-    SOCKET      sock;          // socket of the client.
-    std::string name;          // Name of the client
+    SOCKET      sock;          // socket of the connection.
+    std::string name;          // Name of the origin from the connection.
+    uint32_nt   id;            // The connection ID, given by the server.
 
     pthread_t   server_thread; // [Server-side] store the client procesing thread
     SOCKADDR_IN address;       // [server-side] store the address information.
     _client_*   mirror;        // [server-side] Mirror client connection.
     void*       server;        // [Server-side] Server creating this client.
+    buffer_t    pubkey;        // Public Key to decrypt data received.
 
     _client_ () : sock(0) {}
 
@@ -60,6 +71,18 @@ gerror_t client_create(client_t* client, const char* adress, size_t port);
  *  The same as send_client_packet().
 **/
 gerror_t client_send_packet(client_t* client, uint8_t packet_type, const void* data, size_t sz);
+
+/** @brief Send a crypted packet to a given client.
+ *
+ *  @param client : Pointer to the client structure.
+ *  @param packet_type : Type of the packet to send.
+ *  @param data : Raw data to send.
+ *  @param sz : Size of the data to send.
+ *
+ *  @return
+ *  - GERROR_NONE if everything turned right.
+**/
+gerror_t client_send_cryptpacket(client_t* client, uint8_t packet_type, const void* data, size_t sz);
 
 /** @brief Send a file to a given client.
  *

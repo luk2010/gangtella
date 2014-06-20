@@ -18,5 +18,6 @@ Currently supported platforms :
 
 Libraries needed :
 * pthread
+* libcrypto (OpenSSL)
 * A correct socket implementation (posix or WSA) 
 

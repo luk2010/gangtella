@@ -247,3 +247,82 @@
 	"server.h"
 	"packet.h"
 
+1403270831 source:/home/luk2010/Projects/gangtella/client.cpp
+	"packet.h"
+	"client.h"
+	"server.h"
+
+1403273630 /home/luk2010/Projects/gangtella/packet.h
+	"prerequesites.h"
+
+1403272627 /home/luk2010/Projects/gangtella/prerequesites.h
+	<unistd.h>
+	<typeinfo>
+	<fstream>
+	<iostream>
+	<errno.h>
+	<string>
+	<cstring>
+	<cstdio>
+	<vector>
+	<signal.h>
+	<time.h>
+	<pthread.h>
+	<stdio.h>
+	<stdlib.h>
+	<map>
+	<openssl/rsa.h>
+	<windows.h>
+	<winsock2.h>
+	<sys/types.h>
+	<sys/socket.h>
+	<netinet/in.h>
+	<arpa/inet.h>
+	<netdb.h>
+	"serializer.h"
+
+1401869453 /home/luk2010/Projects/gangtella/serializer.h
+	"prerequesites.h"
+
+1403269690 /home/luk2010/Projects/gangtella/client.h
+	"prerequesites.h"
+
+1403272789 source:/home/luk2010/Projects/gangtella/main.cpp
+	"prerequesites.h"
+	"commands.h"
+	"packet.h"
+	"client.h"
+	"server.h"
+
+1403201085 /home/luk2010/Projects/gangtella/server.h
+	"prerequesites.h"
+	"client.h"
+	"encryption.h"
+
+1403273661 source:/home/luk2010/Projects/gangtella/packet.cpp
+	"packet.h"
+
+1401869463 source:/home/luk2010/Projects/gangtella/serializer.cpp
+	"serializer.h"
+
+1403203298 source:/home/luk2010/Projects/gangtella/prerequesites.cpp
+	"prerequesites.h"
+
+1403273768 source:/home/luk2010/Projects/gangtella/server.cpp
+	"prerequesites.h"
+	"server.h"
+	"packet.h"
+
+1403109012 source:/home/luk2010/Projects/gangtella/commands.cpp
+	"commands.h"
+
+1403102031 /home/luk2010/Projects/gangtella/commands.h
+	"prerequesites.h"
+
+1403272610 source:/home/luk2010/Projects/gangtella/encryption.cpp
+	"encryption.h"
+	<openssl/pem.h>
+
+1403272429 /home/luk2010/Projects/gangtella/encryption.h
+	"prerequesites.h"
+

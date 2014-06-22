@@ -122,7 +122,11 @@ Packet* receive_client_packet(SOCKET sock, size_t min_packet_size)
     if(len > 0)
     {
         data = (unsigned char*) malloc(len);
-        len = recv(sock, data, len, 0);
+#ifdef _LINUX
+        len = recv(sock, (unsigned char*) data, len, 0);
+#elif defined _WIN32
+        len = recv(sock, (char*) data, len, 0);
+#endif // defined
     }
 
     return packet_interpret(sock, ptype, packet, data, len);
@@ -221,7 +225,7 @@ Packet* packet_interpret(SOCKET sock, const uint8_t type, Packet* packet, unsign
     {
         ClientSendFileChunkPacket* csfcp = reinterpret_cast<ClientSendFileChunkPacket*>(packet);
 
-        if(len == 0 || len > min_packet_size)
+        if(len == 0 /* || len > min_packet_size */)
         {
             std::cerr << "[Packet] Receiving bad ClientSendFileChunkPacket structure. Received " << len << "bytes instead of " << min_packet_size << "bytes." << std::endl;
             delete csfcp;

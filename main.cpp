@@ -276,6 +276,7 @@ int main(int argc, char* argv[])
 
     server_create(&server, server_name);
     server_initialize(&server, server_port, server_max_clients);
+    server_setsendpolicy(&server, gangtella::SP_CRYPTED);
 
     // Creation thread serveur
     std::cout << "[Main] Creating Server thread." << std::endl;

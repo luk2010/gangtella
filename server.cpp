@@ -119,6 +119,9 @@ gerror_t server_create(server_t* server, const std::string& disp_name)
         delete server->pubkey;
     }
 
+    // We set it to normal for now.
+    server_setsendpolicy(server, SP_NORMAL);
+
 #ifdef GULTRA_DEBUG
     std::cout << "[Server] Key lenght = " << server->pubkey->size << "." << std::endl;
     std::cout << "[Server] Public key = '" << std::string(reinterpret_cast<char*>(server->pubkey->buf), server->pubkey->size) << "'." << std::endl;
@@ -376,81 +379,71 @@ gerror_t server_destroy(server_t* server)
     return err;
 }
 
-
-
-
-void* server_client_thread_loop(void* data)
+gerror_t server_setsendpolicy(server_t* server, int policy)
 {
-    client_t* client = (client_t*) data;
-    server_t* org    = (server_t*) client->server;
+    if(policy > SP_CRYPTED || policy < SP_NORMAL || !server)
+        return GERROR_BADARGS;
 
-    while(1)
+    if(policy == SP_NORMAL)
+        server->client_send = client_send_packet;
+    if(policy == SP_CRYPTED)
+        server->client_send = client_send_cryptpacket;
+
+    return GERROR_NONE;
+}
+
+Packet* server_receive_packet(server_t* server, client_t* client, size_t min_packet_size)
+{
+    Packet* pclient = receive_client_packet(client->sock);
+    if(!pclient)
     {
-        Packet* pclient = receive_client_packet(client->sock);
-        if(!pclient)
-        {
-            std::cout << "[Server] Invalid packet reception." << std::endl;
-            if(client->server)
-                server_end_client((server_t*) client->server, client->name);
-            else
-                client_close(client);
+        std::cout << "[Server] Invalid packet reception." << std::endl;
+        if(client->server)
+            server_end_client((server_t*) client->server, client->name);
+        else
+            client_close(client);
 
-            return NULL;
-        }
+        return NULL;
+    }
 
-        if(pclient->m_type == PT_ENCRYPTED_INFO)
-        {
-            // We received encrypted data
+    if(pclient->m_type == PT_ENCRYPTED_INFO)
+    {
+        // We received encrypted data
 #ifdef GULTRA_DEBUG
-            std::cout << "[Server]{" << client->name << "} Received Encrypted data." << std::endl;
+        std::cout << "[Server]{" << client->name << "} Receiving Encrypted data." << std::endl;
 #endif // GULTRA_DEBUG
 
-            // Verifying we have the public key
-            if(client->pubkey.size > 0)
+        // Verifying we have the public key
+        if(client->pubkey.size > 0)
+        {
+            EncryptedInfoPacket* eip    = reinterpret_cast<EncryptedInfoPacket*>(pclient);
+            size_t chunk_size   = RSA_SIZE;
+            size_t data_size    = chunk_size - 11;
+            size_t chunk_num    = eip->info.cryptedblock_number.data;
+            size_t chunk_lastsz = eip->info.cryptedblock_lastsz.data;
+            buffer_t& pubkey    = client->pubkey;
+            uint8_t ptype       = eip->info.ptype;
+            Packet* cpacket     = packet_choose_policy(ptype);
+            if(!cpacket)
             {
-                EncryptedInfoPacket* eip    = reinterpret_cast<EncryptedInfoPacket*>(pclient);
-                size_t chunk_size   = RSA_SIZE;
-                size_t data_size    = chunk_size - 11;
-                size_t chunk_num    = eip->info.cryptedblock_number.data;
-                size_t chunk_lastsz = eip->info.cryptedblock_lastsz.data;
-                buffer_t& pubkey    = client->pubkey;
-                uint8_t ptype       = eip->info.ptype;
-                Packet* cpacket     = packet_choose_policy(ptype);
-                if(!cpacket)
+                std::cout << "[Server]{" << client->name << "} Can't choose good policy for Packet !" << std::endl;
+                delete eip;
+                pclient = nullptr;
+                goto ret_pclient;
+            }
+
+            // Checking chunk number
+            if(chunk_num > 1)
+            {
+                // We have chunk_num chunks to fill
+                size_t         total_size = data_size * (chunk_num - 1) + chunk_lastsz;
+                unsigned char* recvdata   = nullptr;
+                unsigned char* data       = reinterpret_cast<unsigned char*>(cpacket) + sizeof(Packet);
+                unsigned char* current    = nullptr;
+                Packet*        chunk      = nullptr;
+                unsigned int i = 0;
+                for(; i < chunk_num - 1; ++i)
                 {
-                    std::cout << "[Server]{" << client->name << "} Can't choose good policy for Packet !" << std::endl;
-                    delete eip;
-                    continue;
-                }
-
-                // Checking chunk number
-                if(chunk_num > 1)
-                {
-                    // We have chunk_num chunks to fill
-//                  size_t         total_size = chunk_size * (chunk_num - 1) + chunk_lastsz;
-                    unsigned char* recvdata   = nullptr;
-                    unsigned char* data       = reinterpret_cast<unsigned char*>(cpacket) + sizeof(Packet);
-                    unsigned char* current    = nullptr;
-                    Packet*        chunk      = nullptr;
-                    unsigned int i = 0;
-                    for(; i < chunk_num - 1; ++i)
-                    {
-                        current = data + ( i * ( RSA_SIZE - 11 ) );
-                        chunk = receive_client_packet(client->sock, chunk_size);
-                        if(chunk->m_type != PT_ENCRYPTED_CHUNK)
-                        {
-                            std::cout << "[Server]{" << client->name << "} Can't receive Encrypted chunk !" << std::endl;
-                            delete chunk;
-                            delete cpacket;
-                            delete eip;
-                            continue;
-                        }
-
-                        EncryptedChunkPacket* echunk = reinterpret_cast<EncryptedChunkPacket*>(chunk);
-                        recvdata = echunk->chunk;
-                        Encryption::decrypt(pubkey, current, recvdata, chunk_size);
-                    }
-
                     current = data + ( i * ( RSA_SIZE - 11 ) );
                     chunk = receive_client_packet(client->sock, chunk_size);
                     if(chunk->m_type != PT_ENCRYPTED_CHUNK)
@@ -459,68 +452,117 @@ void* server_client_thread_loop(void* data)
                         delete chunk;
                         delete cpacket;
                         delete eip;
-                        continue;
+                        pclient = nullptr;
+                        goto ret_pclient;
                     }
 
                     EncryptedChunkPacket* echunk = reinterpret_cast<EncryptedChunkPacket*>(chunk);
                     recvdata = echunk->chunk;
-                    int sz = Encryption::decrypt(pubkey, current, recvdata, chunk_size);
-
-                    delete chunk;
-                    delete eip;
-                    pclient         = cpacket;
-                    pclient->m_type = ptype;
-                    std::cout << "[Server]{" << client->name << "} Received Encrypted Packet." << std::endl;
-                    std::cout << "[Server]{" << client->name << "} Type = " << (int) pclient->m_type << ", size = " << sz << "." << std::endl;
+                    Encryption::decrypt(pubkey, current, recvdata, chunk_size);
                 }
-                else
+
+                current = data + ( i * ( RSA_SIZE - 11 ) );
+                chunk = receive_client_packet(client->sock, chunk_size);
+                if(chunk->m_type != PT_ENCRYPTED_CHUNK)
                 {
-                    size_t         total_size = chunk_lastsz;
-                    unsigned char* recvdata   = nullptr;
-                    unsigned char* data       = (unsigned char*) malloc(data_size);
-                    Packet*        chunk      = nullptr;
-
-                    chunk = receive_client_packet(client->sock, chunk_size);
-                    if(chunk->m_type != PT_ENCRYPTED_CHUNK)
-                    {
-                        std::cout << "[Server]{" << client->name << "} Can't receive Encrypted chunk !" << std::endl;
-                        delete chunk;
-                        delete cpacket;
-                        delete eip;
-                        continue;
-                    }
-
-                    EncryptedChunkPacket* echunk = reinterpret_cast<EncryptedChunkPacket*>(chunk);
-                    recvdata = echunk->chunk;
-                    int sz = Encryption::decrypt(pubkey, data, recvdata, chunk_size);
-
+                    std::cout << "[Server]{" << client->name << "} Can't receive Encrypted chunk !" << std::endl;
                     delete chunk;
+                    delete cpacket;
                     delete eip;
-                    pclient = cpacket;
-                    pclient = packet_interpret(client->sock, ptype, pclient, data, total_size);
-                    std::cout << "[Server]{" << client->name << "} Received Encrypted Packet." << std::endl;
-                    std::cout << "[Server]{" << client->name << "} Type = " << (int) pclient->m_type << ", size = " << sz << "." << std::endl;
+                    pclient = nullptr;
+                    goto ret_pclient;
                 }
+
+                EncryptedChunkPacket* echunk = reinterpret_cast<EncryptedChunkPacket*>(chunk);
+                recvdata = echunk->chunk;
+                Encryption::decrypt(pubkey, current, recvdata, chunk_size);
+
+                delete chunk;
+                delete eip;
+                pclient = cpacket;
+                pclient = packet_interpret(client->sock, ptype, pclient, data, total_size);
+
+#ifdef GULTRA_DEBUG
+                std::cout << "[Server]{" << client->name << "} Received Encrypted Packet. Packet num = " << chunk_num << "." << std::endl;
+                std::cout << "[Server]{" << client->name << "} Type = " << (int) pclient->m_type << ", size = " << total_size << "." << std::endl;
+#endif // GULTRA_DEBUG
+
+            }
+            else if(chunk_num == 1)
+            {
+                size_t         total_size = chunk_lastsz;
+                unsigned char* recvdata   = nullptr;
+                unsigned char* data       = (unsigned char*) malloc(data_size);
+                Packet*        chunk      = nullptr;
+
+                chunk = receive_client_packet(client->sock, chunk_size);
+                if(chunk->m_type != PT_ENCRYPTED_CHUNK)
+                {
+                    std::cout << "[Server]{" << client->name << "} Can't receive Encrypted chunk !" << std::endl;
+                    delete chunk;
+                    delete cpacket;
+                    delete eip;
+                    pclient = nullptr;
+                    goto ret_pclient;
+                }
+
+                EncryptedChunkPacket* echunk = reinterpret_cast<EncryptedChunkPacket*>(chunk);
+                recvdata = echunk->chunk;
+                int sz = Encryption::decrypt(pubkey, data, recvdata, chunk_size);
+
+                delete chunk;
+                delete eip;
+                pclient = cpacket;
+                pclient = packet_interpret(client->sock, ptype, pclient, data, total_size);
+
+#ifdef GULTRA_DEBUG
+                std::cout << "[Server]{" << client->name << "} Received Encrypted Packet." << std::endl;
+                std::cout << "[Server]{" << client->name << "} Type = " << (int) pclient->m_type << ", size = " << sz << "." << std::endl;
+#endif // GULTRA_DEBUG
+
             }
             else
             {
-                std::cout << "[Server]{" << client->name << "} Can't decrypt data without public key !" << std::endl;
-                delete pclient;
-                continue;
+                pclient = cpacket;
+                pclient = packet_interpret(client->sock, ptype, pclient, 0, 0);
+
+#ifdef GULTRA_DEBUG
+                std::cout << "[Server]{" << client->name << "} Received Encrypted Packet." << std::endl;
+#endif // GULTRA_DEBUG
             }
         }
+        else
+        {
+            std::cout << "[Server]{" << client->name << "} Can't decrypt data without public key !" << std::endl;
+            pclient = nullptr;
+        }
+    }
+
+ret_pclient:
+    return pclient;
+}
+
+void* server_client_thread_loop(void* data)
+{
+    client_t* client = (client_t*) data;
+    server_t* org    = (server_t*) client->server;
+
+    while(1)
+    {
+        Packet* pclient = server_receive_packet(org, client);
 
         if(pclient->m_type == PT_CLIENT_CLOSING_CONNECTION)
         {
             std::cout << "[Server] Closing connection with client '" << client->name << "'." << std::endl;
 
+            uint32_t cid = ID_CLIENT_INVALID;
             if(client->mirror != NULL)
             {
+                cid = client->mirror->id.data;
                 client_close(client->mirror, false);
                 delete client->mirror;
                 client->mirror = 0;
             }
-
             closesocket(client->sock);
             client->sock = 0;
 
@@ -537,6 +579,10 @@ void* server_client_thread_loop(void* data)
                     }
                 }
             }
+
+            if(cid != ID_CLIENT_INVALID)
+                org->client_by_id[cid] = nullptr;
+
             gthread_mutex_unlock(&org->mutex);
 
             return NULL;
@@ -566,7 +612,7 @@ void* server_client_thread_loop(void* data)
             {
                 std::cout << "[Server] File Chunk count -> " << csfip->info.chunk_count.data << "." << std::endl;
 
-                Packet* pchunkpacket = receive_client_packet(client->sock, csfip->info.chunk_lenght.data);
+                Packet* pchunkpacket = server_receive_packet(org, client /*, csfip->info.chunk_lenght.data */);
                 if(!pchunkpacket)
                 {
                     std::cout << "[Server] Can't receive client chunk." << std::endl;
@@ -592,9 +638,9 @@ void* server_client_thread_loop(void* data)
 
                     chunk++;
                     if(chunk == csfip->info.chunk_count.data)
-                        pchunkpacket = receive_client_packet(client->sock, csfip->info.chunk_lastsize.data);
+                        pchunkpacket = server_receive_packet(org, client /*, csfip->info.chunk_lastsize.data */);
                     else
-                        pchunkpacket = receive_client_packet(client->sock, csfip->info.chunk_lenght.data);
+                        pchunkpacket = server_receive_packet(org, client /*, csfip->info.chunk_lenght.data */);
                 }
 
                 if(pchunkpacket && pchunkpacket->m_type != PT_CLIENT_SENDFILE_TERMINATE)
@@ -603,13 +649,13 @@ void* server_client_thread_loop(void* data)
             }
             else
             {
-                Packet*                    pchunkpacket = receive_client_packet(client->sock);
+                Packet*                    pchunkpacket = server_receive_packet(org, client);
                 ClientSendFileChunkPacket* csfcp        = reinterpret_cast<ClientSendFileChunkPacket*>(pchunkpacket);
 
                 ofs.write(csfcp->chunk, csfip->info.lenght.data);
                 std::cout << "[Server] Written chunk -> " << csfip->info.lenght.data << " bytes." << std::endl;
 
-                pchunkpacket = receive_client_packet(client->sock);
+                pchunkpacket = server_receive_packet(org, client);
                 if(pchunkpacket && pchunkpacket->m_type != PT_CLIENT_SENDFILE_TERMINATE)
                     std::cout << "[Server] Bad end of connection ! Closing file." << std::endl;
                 ofs.close();
@@ -646,7 +692,11 @@ void* server_thread_loop(void* __serv)
         /* A new client come. */
         SOCKADDR_IN csin = { 0 };
         size_t sin_size = sizeof(csin);
+#ifdef _LINUX
         int csock = accept(server->sock, (SOCKADDR*) &csin, (unsigned int*) &sin_size);
+#elif defined _WIN32
+        int csock = accept(server->sock, (SOCKADDR*) &csin, (int*) &sin_size);
+#endif // defined
         if(csock == SOCKET_ERROR)
         {
             std::cerr << "[Server] Can't accept client !" << std::endl;
@@ -696,7 +746,7 @@ void* server_thread_loop(void* __serv)
                     new_client.mirror         = new client_t;
                     new_client.mirror->id     = server_generate_new_id(server);
                     new_client.mirror->name   = server->name;
-                    new_client.mirror->server = server;
+                    new_client.mirror->server = (void*) server;
                     new_client.mirror->mirror = nullptr;
 
                     // We create the connection
@@ -738,7 +788,7 @@ void* server_thread_loop(void* __serv)
 
                     // We now send the PT_CONNECTION_ESTABLISHED packet and create the client thread.
                     server_create_client_thread_loop(server, cclient);
-                    client_send_packet(cclient->mirror, PT_CLIENT_ESTABLISHED, NULL, 0);
+                    server->client_send(cclient->mirror, PT_CLIENT_ESTABLISHED, NULL, 0);
 
                     // If everything is alright, we can tell user
                     std::cout << "[Server] New Client connected (name = '" << cclient->name << "', id = '" << cclient->mirror->id.data << "')." << std::endl;
@@ -828,6 +878,8 @@ gerror_t server_init_client_connection(server_t* server, client_t*& out, const c
     if(client_create(mirror, adress, port) != GERROR_NONE)
     {
         std::cout << "[Server] Can't create client connection for adress '" << adress << ":" << (uint32_t) port << "'." << std::endl;
+
+        delete mirror;
         return GERROR_INVALID_CONNECT;
     }
 
@@ -872,6 +924,8 @@ gerror_t server_init_client_connection(server_t* server, client_t*& out, const c
     // Now the destination should receive the PT_CLIENT_INFO packet, and send us
     // PT_CLIENT_INFO        to complete the client_t structure
     // PT_CLIENT_ESTABLISHED to be sure that everythig went fine
+    // NOTE : Once PT_CLIENT_INFO packet is sent, we only use server->client_send to send
+    // packet to the client.
 
 #ifdef GULTRA_DEBUG
     std::cout << "[Server] Client inited." << std::endl;

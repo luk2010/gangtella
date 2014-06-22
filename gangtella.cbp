@@ -19,6 +19,7 @@
 				</Compiler>
 				<Linker>
 					<Add option="-lws2_32" />
+					<Add option="-leay32" />
 				</Linker>
 			</Target>
 			<Target title="WIN_RELEASE">
@@ -69,7 +70,6 @@
 		</Compiler>
 		<Linker>
 			<Add option="-lpthread" />
-			<Add option="-lcrypto" />
 		</Linker>
 		<Unit filename="client.cpp" />
 		<Unit filename="client.h" />

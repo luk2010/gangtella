@@ -174,7 +174,8 @@ static const char* __errors [GERROR_MAX] = {
     "Can't generate RSA key pair.",
     "Error in BIO functions.",
     "Error reading bio.",
-    "Error writing encryption."
+    "Error writing encryption.",
+    "Invalid Packet Type."
 };
 
 const char* gerror_to_string(gerror_t& err)

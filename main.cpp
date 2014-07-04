@@ -27,7 +27,7 @@
 #include "client.h"
 #include "server.h"
 
-using namespace gangtella;
+using namespace Gangtella;
 
 server_t  server;
 
@@ -54,7 +54,10 @@ void treat_command(const std::string& command)
                 client_t* to = server_find_client_by_name(&server, args[1]);
                 if(to != NULL && to->mirror != NULL)
                 {
-                    client_send_cryptpacket(to->mirror, PT_CLIENT_MESSAGE, command.c_str() + 8 + args[1].size() + 1, command.size() - 8 - args[1].size() - 1);
+                    char buffer[SERVER_MAXBUFSIZE];
+                    memset(buffer, 0, SERVER_MAXBUFSIZE);
+                    memcpy(buffer, command.c_str() + 8 + args[1].size() + 1, command.size() - 8 - args[1].size() - 1);
+                    client_send_cryptpacket(to->mirror, PT_CLIENT_MESSAGE, buffer, SERVER_MAXBUFSIZE);
                 }
             }
 
@@ -176,6 +179,27 @@ void treat_command(const std::string& command)
     }
 }
 
+void bytes_callback(const std::string& name, size_t current, size_t total)
+{
+    std::cout << "\r " << name << " : ";
+    std::cout << current << " \\ " << total << "bytes";
+    std::cout << " |";
+
+    size_t chunk_total = 30;
+    size_t sz_for_one  = total / chunk_total;
+    size_t chunk_num   = current / sz_for_one;
+    size_t blanck_num  = chunk_total - chunk_num;
+
+    for(size_t i = 0; i < chunk_num; ++i)
+        std::cout << "#";
+    for(size_t i = 0; i < blanck_num; ++i)
+        std::cout << " ";
+
+    std::cout << "| ";
+    size_t perc = (100 * chunk_num) / chunk_total;
+    std::cout << perc << "%";
+}
+
 void display_help()
 {
     std::cout << "GangTella is a free communication Project based on The Gang ideas by Luk2010." << std::endl;
@@ -276,7 +300,11 @@ int main(int argc, char* argv[])
 
     server_create(&server, server_name);
     server_initialize(&server, server_port, server_max_clients);
-    server_setsendpolicy(&server, gangtella::SP_CRYPTED);
+    server_setsendpolicy(&server, Gangtella::SP_CRYPTED);
+#ifndef GULTRA_DEBUG
+    server_setbytesreceivedcallback(&server, bytes_callback);
+    server_setbytessendcallback(&server, bytes_callback);
+#endif // GULTRA_DEBUG
 
     // Creation thread serveur
     std::cout << "[Main] Creating Server thread." << std::endl;

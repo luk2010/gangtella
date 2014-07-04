@@ -81,17 +81,36 @@ typedef enum PacketType {
     PT_ENCRYPTED_CHUNK           = 11
 } PacketType;
 
+/** @brief A generic class representing a Packet.
+ *  A Packet is a set of data of given size. This data
+ *  is send by client to the host wich decrypt the data
+ *  and fill this Packet structure depending on the PacketType.
+ *
+ *  @note
+ *  A Packet of type PT_UNKNOWN is invalid.
+**/
 class Packet {
 public:
-    uint8_t m_type;
+    uint8_t m_type;///< Type of the packet.
 
-    Packet() : m_type (PT_UNKNOWN) { m_type = PT_PACKETTYPE; }
+    Packet() : m_type (PT_UNKNOWN) {}
     virtual ~Packet() {}
 
-    virtual size_t getMaxPacketSize() const { return 0; }
-    static size_t GetPacketSize()           { return 0; }
+    /** @brief Return the size of this packet.
+     *  @note This size doesn't take in amount the m_type
+     *  component, as it is never send by client. You should only send
+     *  the requested members in your data.
+     *  Use packet_get_buffer() to get this buffer.
+    **/
+    virtual size_t getPacketSize() const { return 0; }
+
+    /** @brief Returns the type of this packet.
+    **/
+    uint8_t getType() const { return m_type; }
 };
 
+/** @brief Helper class to make generic Packet extensions.
+**/
 template<PacketType Ptype>
 class PacketPolicy : public Packet
 {
@@ -102,15 +121,25 @@ public:
 
 // ----------  PT_PACKETTYPE ------------
 
+/** @brief The first packet send to host is always this one.
+ *  Use this Packet to tell the host you will send him a packet
+ *  of given type. This type must be different from PT_UNKNOWN.
+**/
 template<>
 class PacketPolicy<PT_PACKETTYPE> : public Packet {
 public:
     uint8_t type;
 
     PacketPolicy() : type(PT_UNKNOWN) { m_type = PT_PACKETTYPE; }
+    PacketPolicy(uint8_t _type) : type(_type) { m_type = PT_PACKETTYPE; }
+
     ~PacketPolicy() {}
-    size_t getMaxPacketSize() const { return sizeof(PacketPolicy<PT_PACKETTYPE>); }
-    static size_t GetPacketSize()   { return sizeof(PacketPolicy<PT_PACKETTYPE>); }
+
+    /** @note
+     *  This is the only packet wich size corresponds to the whole object.
+     *  We send the whole object through the Internet !
+    **/
+    size_t getPacketSize() const { return sizeof(PacketPolicy<PT_PACKETTYPE>); }
 };
 typedef PacketPolicy<PT_PACKETTYPE> PacketTypePacket;
 
@@ -126,8 +155,7 @@ public:
     PacketPolicy() { m_type = PT_CLIENT_NAME; }
     ~PacketPolicy() {}
 
-    size_t getMaxPacketSize() const { return SERVER_MAXBUFSIZE - 1; }
-    static size_t GetPacketSize()   { return SERVER_MAXBUFSIZE - 1; }
+    size_t getPacketSize() const { return SERVER_MAXBUFSIZE; }
 };
 typedef PacketPolicy<PT_CLIENT_NAME> ClientNamePacket;
 
@@ -143,8 +171,7 @@ public:
     PacketPolicy() { m_type = PT_CLIENT_MESSAGE; }
     ~PacketPolicy() {}
 
-    size_t getMaxPacketSize() const { return SERVER_MAXBUFSIZE - 1; }
-    static size_t GetPacketSize()   { return SERVER_MAXBUFSIZE - 1; }
+    size_t getPacketSize() const { return SERVER_MAXBUFSIZE; }
 };
 typedef PacketPolicy<PT_CLIENT_MESSAGE> ClientMessagePacket;
 
@@ -160,8 +187,7 @@ public:
     PacketPolicy() { m_type = PT_CLIENT_SENDFILE_INFO; }
     ~PacketPolicy() {}
 
-    size_t getMaxPacketSize() const { return sizeof(struct send_file_t); }
-    static size_t GetPacketSize()   { return sizeof(struct send_file_t); }
+    size_t getPacketSize() const { return sizeof(struct send_file_t); }
 };
 typedef PacketPolicy<PT_CLIENT_SENDFILE_INFO> ClientSendFileInfoPacket;
 
@@ -177,8 +203,7 @@ public:
     PacketPolicy() { m_type = PT_CLIENT_SENDFILE_CHUNK; }
     ~PacketPolicy() {}
 
-    size_t getMaxPacketSize() const { return SERVER_MAXBUFSIZE; }
-    static size_t GetPacketSize()   { return SERVER_MAXBUFSIZE; }
+    size_t getPacketSize() const { return SERVER_MAXBUFSIZE; }
 };
 typedef PacketPolicy<PT_CLIENT_SENDFILE_CHUNK> ClientSendFileChunkPacket;
 
@@ -194,8 +219,7 @@ public:
     PacketPolicy() { m_type = PT_CLIENT_INFO; }
     ~PacketPolicy() {}
 
-    size_t getMaxPacketSize() const { return sizeof(client_info_t); }
-    static size_t GetPacketSize()   { return sizeof(client_info_t); }
+    size_t getPacketSize() const { return sizeof(client_info_t); }
 };
 typedef PacketPolicy<PT_CLIENT_INFO> ClientInfoPacket;
 
@@ -209,8 +233,7 @@ public:
     PacketPolicy() { m_type = PT_ENCRYPTED_INFO; }
     ~PacketPolicy() {}
 
-    size_t getMaxPacketSize() const { return sizeof(encrypted_info_t); }
-    static size_t GetPacketSize()   { return sizeof(encrypted_info_t); }
+    size_t getPacketSize() const { return sizeof(encrypted_info_t); }
 };
 typedef PacketPolicy<PT_ENCRYPTED_INFO> EncryptedInfoPacket;
 
@@ -222,15 +245,15 @@ public:
     PacketPolicy() { m_type = PT_ENCRYPTED_CHUNK; }
     ~PacketPolicy() {}
 
-    size_t getMaxPacketSize() const { return RSA_SIZE; }
-    static size_t GetPacketSize()   { return RSA_SIZE; }
+    size_t getPacketSize() const { return RSA_SIZE; }
 };
 typedef PacketPolicy<PT_ENCRYPTED_CHUNK> EncryptedChunkPacket;
 
 Packet* packet_choose_policy(const int type);
-Packet* packet_interpret(SOCKET sock, const uint8_t type, Packet* packet, unsigned char* data, size_t len);
+gerror_t packet_interpret(const uint8_t type, Packet* packet, unsigned char* data, size_t len);
+gerror_t packet_get_buffer(Packet* p, unsigned char*& buf, size_t& sz);
 
-Packet* receive_client_packet(SOCKET sock, size_t min_packet_size = 0);
+Packet*  receive_client_packet(SOCKET sock);
 gerror_t send_client_packet   (SOCKET sock, uint8_t packet_type, const void* data, size_t sz);
 
 GEND_DECL

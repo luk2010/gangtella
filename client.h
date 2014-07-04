@@ -1,5 +1,24 @@
 /*
-    This file is part of the GangTella project.
+    File        : client.h
+    Description : Client related function
+*/
+
+/*
+    GangTella Project
+    Copyright (C) 2014  Luk2010
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #ifndef __CLIENT__H
@@ -72,31 +91,8 @@ gerror_t client_create(client_t* client, const char* adress, size_t port);
 **/
 gerror_t client_send_packet(client_t* client, uint8_t packet_type, const void* data, size_t sz);
 
-/** @brief Send a crypted packet to a given client.
- *
- *  @param client : Pointer to the client structure.
- *  @param packet_type : Type of the packet to send.
- *  @param data : Raw data to send.
- *  @param sz : Size of the data to send.
- *
- *  @return
- *  - GERROR_NONE if everything turned right.
-**/
-gerror_t client_send_cryptpacket(client_t* client, uint8_t packet_type, const void* data, size_t sz);
 
-/** @brief Send a file to a given client.
- *
- *  @param filename : A string containing the path to the file to send. This path must
- *  have a size inferior to SERVER_MAXBUFSIZE.
- *
- *  @return
- *  - GERROR_NONE on success
- *  - GERROR_BADARGS if one of the given args is null.
- *  - GERROR_BUFSIZEEXCEEDED if the filename size is superior to the server limit.
- *  - GERROR_CANT_SEND_PACKET if a packet could not be send.
- *  - GERROR_IO_CANTREAD if file couldn't be read.
- *  - GERROR_CANTOPENFILE if file couldn't be opened.
-**/
+gerror_t client_send_cryptpacket(client_t* client, uint8_t packet_type, const void* data, size_t sz);
 gerror_t client_send_file(client_t* client, const char* filename);
 
 /** @brief Close a client connection.

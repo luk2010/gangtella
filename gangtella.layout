@@ -1,9 +1,19 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
 <CodeBlocks_layout_file>
-	<ActiveTarget name="WIN_DEBUG" />
-	<File name="server.cpp" open="1" top="1" tabpos="3" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+	<ActiveTarget name="WIN_RELEASE" />
+	<File name="encryption.h" open="1" top="0" tabpos="11" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="17432" topLine="414" />
+			<Cursor1 position="100" topLine="0" />
+		</Cursor>
+	</File>
+	<File name="client.cpp" open="1" top="0" tabpos="7" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="3686" topLine="142" />
+		</Cursor>
+	</File>
+	<File name="client.h" open="1" top="0" tabpos="6" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="3421" topLine="77" />
 		</Cursor>
 	</File>
 	<File name="serializer.h" open="0" top="0" tabpos="10" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
@@ -11,14 +21,24 @@
 			<Cursor1 position="1787" topLine="27" />
 		</Cursor>
 	</File>
+	<File name="serializer.cpp" open="0" top="0" tabpos="11" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="1219" topLine="0" />
+		</Cursor>
+	</File>
 	<File name="commands.h" open="1" top="0" tabpos="8" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
 			<Cursor1 position="2" topLine="0" />
 		</Cursor>
 	</File>
+	<File name="server.h" open="1" top="0" tabpos="2" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="3194" topLine="28" />
+		</Cursor>
+	</File>
 	<File name="encryption.cpp" open="1" top="0" tabpos="12" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="2709" topLine="61" />
+			<Cursor1 position="3032" topLine="45" />
 		</Cursor>
 	</File>
 	<File name="commands.cpp" open="1" top="0" tabpos="9" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
@@ -26,54 +46,34 @@
 			<Cursor1 position="1179" topLine="7" />
 		</Cursor>
 	</File>
+	<File name="prerequesites.cpp" open="1" top="0" tabpos="5" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="4916" topLine="143" />
+		</Cursor>
+	</File>
 	<File name="prerequesites.h" open="1" top="0" tabpos="4" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="1529" topLine="171" />
+			<Cursor1 position="3961" topLine="102" />
 		</Cursor>
 	</File>
-	<File name="serializer.cpp" open="0" top="0" tabpos="11" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+	<File name="main.cpp" open="1" top="1" tabpos="1" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="1219" topLine="0" />
-		</Cursor>
-	</File>
-	<File name="main.cpp" open="1" top="0" tabpos="1" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
-		<Cursor>
-			<Cursor1 position="11006" topLine="33" />
+			<Cursor1 position="11758" topLine="282" />
 		</Cursor>
 	</File>
 	<File name="packet.cpp" open="1" top="0" tabpos="13" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="4177" topLine="135" />
-		</Cursor>
-	</File>
-	<File name="prerequesites.cpp" open="1" top="0" tabpos="5" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
-		<Cursor>
-			<Cursor1 position="5206" topLine="158" />
-		</Cursor>
-	</File>
-	<File name="server.h" open="1" top="0" tabpos="2" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
-		<Cursor>
-			<Cursor1 position="2" topLine="0" />
-		</Cursor>
-	</File>
-	<File name="encryption.h" open="1" top="0" tabpos="11" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
-		<Cursor>
-			<Cursor1 position="1592" topLine="23" />
-		</Cursor>
-	</File>
-	<File name="client.cpp" open="1" top="0" tabpos="7" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
-		<Cursor>
-			<Cursor1 position="6022" topLine="169" />
-		</Cursor>
-	</File>
-	<File name="client.h" open="1" top="0" tabpos="6" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
-		<Cursor>
-			<Cursor1 position="2056" topLine="54" />
+			<Cursor1 position="8289" topLine="230" />
 		</Cursor>
 	</File>
 	<File name="packet.h" open="1" top="0" tabpos="10" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="6702" topLine="196" />
+			<Cursor1 position="1095" topLine="0" />
+		</Cursor>
+	</File>
+	<File name="server.cpp" open="1" top="0" tabpos="3" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="17749" topLine="501" />
 		</Cursor>
 	</File>
 </CodeBlocks_layout_file>

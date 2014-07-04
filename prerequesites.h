@@ -126,12 +126,13 @@ STATIC_ASSERT(sizeof(double)   == 8, invalid_double_size);
 #define SERVER_MAXBUFSIZE    1024
 #define RSA_SIZE             256  // Size of chunk in RSA. Data must be 256 - 11 size.
 
-#define GULTRA_DEBUG         1    // Define this if you want every debug things.
-
+#ifdef _DEBUG
+#   define GULTRA_DEBUG         1    // Define this if you want every debug things.
+#endif // _DEBUG
 
 // C++ special declaration
 #ifdef __cplusplus
-#   define GBEGIN_DECL namespace gangtella {
+#   define GBEGIN_DECL namespace Gangtella {
 #   define GEND_DECL   }
 #else
 #   define GBEGIN_DECL
@@ -167,8 +168,9 @@ typedef enum GError
     GERROR_ENCRYPT_BIO       = 18,
     GERROR_ENCRYPT_BIOREAD   = 19,
     GERROR_ENCRYPT_WRITE     = 20,
+    GERROR_INVALID_PACKET    = 21,
 
-    GERROR_MAX               = 21  // Number of errors
+    GERROR_MAX               = 22  // Number of errors
 } GError;
 typedef int gerror_t;
 

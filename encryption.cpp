@@ -51,6 +51,8 @@ namespace Encryption
             printf( "Failed to create RSA");
         }
 
+        BIO_free(keybio);
+
         return rsa;
     }
 
@@ -85,6 +87,12 @@ namespace Encryption
         return GERROR_NONE;
     }
 
+    /** @brief Crypt data
+     *  @param rsa  : RSA private key
+     *  @param to   : Buffer to store data. Size of buffer must be RSA_SIZE.
+     *  @param from : Buffer to read the data.
+     *  @param flen : Size of buffer from. Must be inferior or equal to RSA_SIZE - 11.
+    **/
     int crypt(encryption_t* rsa, unsigned char* to, unsigned char* from, size_t flen)
     {
         // Crypt from private key
@@ -92,10 +100,18 @@ namespace Encryption
         return result;
     }
 
+    /** @brief Decrypt data
+     *  @param pubkey : The public key to decrypt the data.
+     *  @param to     : Buffer to hold the message digest. Size of this buffer must be
+     *                  RSA_SIZE - 11.
+     *  @param from   : Buffer to decrypt.
+     *  @param flen   : Lenght of this buffer. It must not be superior to RSA_SIZE.
+    **/
     int decrypt(buffer_t& pubkey, unsigned char* to, unsigned char* from, size_t flen)
     {
         RSA* rsa   = createRSA(pubkey.buf, 1);
         int result = RSA_public_decrypt(flen, from, to, rsa, RSA_PKCS1_PADDING);
+        RSA_free(rsa);
         return result;
     }
 
@@ -105,7 +121,9 @@ namespace Encryption
             return GERROR_BADARGS;
 
         int err = GERROR_NONE;
-        biobox_t bio = { nullptr };
+        biobox_t bio;
+        bio.bio = nullptr;
+        bio.buf.size = 0;
 
 #ifdef GULTRA_DEBUG
         std::cout << "[Encryption] Creating BIO buffer." << std::endl;

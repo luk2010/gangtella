@@ -250,7 +250,7 @@ public:
 typedef PacketPolicy<PT_ENCRYPTED_CHUNK> EncryptedChunkPacket;
 
 Packet* packet_choose_policy(const int type);
-gerror_t packet_interpret(const uint8_t type, Packet* packet, unsigned char* data, size_t len);
+gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size_t len);
 gerror_t packet_get_buffer(Packet* p, unsigned char*& buf, size_t& sz);
 
 Packet*  receive_client_packet(SOCKET sock);

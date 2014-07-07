@@ -26,6 +26,19 @@
 
 /* ******************************************************************* */
 
+#define GVERSION_MAJ   "0"
+#define GVERSION_MIN   "1"
+
+#ifdef _DEBUG
+#define GVERSION_BUILD "1d"
+#else
+#define GVERSION_BUILD "1"
+#endif // _DEBUG
+
+#define GANGTELLA_VERSION GVERSION_MAJ "." GVERSION_MIN "." GVERSION_BUILD
+
+
+
 /*
     These are standards headers. They are common for every operating
     systems so we don't need to change any of them.
@@ -68,6 +81,8 @@
 #include <windows.h>
 #include <winsock2.h>
 
+typedef char data_t; // This type is used to send or recv data.
+
 /* ******************************************************************* */
 
 
@@ -92,6 +107,7 @@ typedef int SOCKET;
 typedef struct sockaddr_in SOCKADDR_IN;
 typedef struct sockaddr    SOCKADDR;
 typedef struct in_addr     IN_ADDR;
+typedef unsigned char      data_t;     // This type is used to send or recv data.
 
 /* ******************************************************************* */
 
@@ -99,7 +115,7 @@ typedef struct in_addr     IN_ADDR;
 
 #else
 
-#error No Implementation of socket found.
+#error No socket implementation available on your platform.
 
 #endif
 

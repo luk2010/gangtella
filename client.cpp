@@ -33,7 +33,7 @@ gerror_t client_create(client_t* client, const char* adress, size_t port)
         return GERROR_BADARGS;
 
     SOCKET sock     = socket(AF_INET, SOCK_STREAM, 0);
-    SOCKADDR_IN sin = { 0 };
+    SOCKADDR_IN sin;
     struct hostent* hostinfo;
 
     if(sock == INVALID_SOCKET)
@@ -153,6 +153,8 @@ gerror_t client_send_cryptpacket(client_t* client, uint8_t packet_type, const vo
         unsigned char* chunk   = reinterpret_cast<unsigned char*>(const_cast<void*>(data));
         unsigned char* current = nullptr;
         unsigned char* to      = (unsigned char*) malloc(RSA_SIZE);
+        memset(to, 0, RSA_SIZE);
+
         unsigned int i = 0;
         for (; i < info.cryptedblock_number.data - 1; ++i)
         {

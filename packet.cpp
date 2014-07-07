@@ -137,7 +137,7 @@ Packet* packet_choose_policy(const int type)
  *  This function is a low-level function.
  *  @note
  *  It is a blocking function. Untill the client send a packet
- *  to this host, it will wait for something to be received.
+ *  to this host, it will wait for something to receive.
  *
  *  @param sock : Socket to receive the packet.
  *  @return nullptr on failure, a pointer to the newly received packet.
@@ -159,19 +159,14 @@ Packet* receive_client_packet(SOCKET sock)
 
     // We construct the packet depending on his type.
     Packet* packet = packet_choose_policy(ptp.type);
-    unsigned char* data = nullptr;
+    data_t* data = nullptr;
     size_t len = packet->getPacketSize();
 
     if(len > 0)
     {
-        data = (unsigned char*) malloc(len);
+        data = (data_t*) malloc(len);
         memset(data, 0, len);
-
-#ifdef _LINUX
-        len = recv(sock, (unsigned char*) data, len, 0);
-#elif defined _WIN32
-        len = recv(sock, (char*) data, len, 0);
-#endif // defined
+        len = recv(sock, data, len, 0);
     }
 
     // Interpret the packet
@@ -205,14 +200,14 @@ Packet* receive_client_packet(SOCKET sock)
  *  right type. This pointer will have his data changed during the process.
  *  @param data : Pointer to a bytesfield of data. This data must represent the exact data of the Packet.
  *  @note It may be null for some Packets.
- *  @param len : Lenght of the data. This lenght must be equal to the Packet data size. @note It may
+ *  @param len : Lenght of the data. This lenght must be equal to the Packet data size.
  *
  *  @return
  *  - GERROR_NONE on success
  *  - GERROR_BADARGS if one of the argues is invalid.
 
 **/
-gerror_t packet_interpret(const uint8_t type, Packet* packet, unsigned char* data, size_t len)
+gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size_t len)
 {
     if(type == PT_UNKNOWN || !packet)
         return GERROR_BADARGS;
@@ -334,7 +329,7 @@ gerror_t send_client_packet(SOCKET sock, uint8_t packet_type, const void* data, 
 
     // Send the PT_PACKETTYPE first
     PacketTypePacket ptp(packet_type);
-    if(send(sock, (char*) &ptp, ptp.getPacketSize(), 0) < 0)
+    if(send(sock, (data_t*) &ptp, ptp.getPacketSize(), 0) < 0)
     {
         std::cout << "[Packet] Can't send PT_PACKETTYPE." << std::endl;
         return GERROR_CANT_SEND_PACKET;
@@ -343,7 +338,7 @@ gerror_t send_client_packet(SOCKET sock, uint8_t packet_type, const void* data, 
     // Send the data if any.
     if(sz > 0 && data != NULL)
     {
-        if(send(sock, (const char*) data, sz, 0) < 0)
+        if(send(sock, (data_t*) data, sz, 0) < 0)
         {
             std::cerr << "[Packet] Can't send data packet." << std::endl;
             return GERROR_CANT_SEND_PACKET;
@@ -356,11 +351,11 @@ gerror_t send_client_packet(SOCKET sock, uint8_t packet_type, const void* data, 
 /** @brief Return an unsigned char* buffer and give the size
  *  of this buffer from given packet.
 **/
-gerror_t packet_get_buffer(Packet* p, unsigned char*& buf, size_t& sz)
+gerror_t packet_get_buffer(Packet* p, data_t*& buf, size_t& sz)
 {
     if(p)
     {
-        buf = reinterpret_cast<unsigned char*>(p) + sizeof(Packet);
+        buf = reinterpret_cast<data_t*>(p) + sizeof(Packet);
         sz  = p->getPacketSize();
         return GERROR_NONE;
     }

@@ -232,6 +232,8 @@ void display_help()
 
 int main(int argc, char* argv[])
 {
+    std::cout << "GangTella v." << GANGTELLA_VERSION << "."  << std::endl;
+
     // Argues
 
     int server_port           = SERVER_PORT;

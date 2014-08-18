@@ -63,8 +63,8 @@ void treat_command(const std::string& command)
 
             else
             {
-                std::cout << "[Command]<help> message [client name] [message]"        << std::endl;
-                std::cout << "[Command]<help> Send a message to given active client." << std::endl;
+                cout << "[Command]<help> message [client name] [message]"        << endl;
+                cout << "[Command]<help> Send a message to given active client." << endl;
             }
         }
 
@@ -86,8 +86,8 @@ void treat_command(const std::string& command)
 
             else
             {
-                std::cout << "[Command]<help> messageall [message]"                    << std::endl;
-                std::cout << "[Command]<help> Send a message to every active clients." << std::endl;
+                cout << "[Command]<help> messageall [message]"                    << endl;
+                cout << "[Command]<help> Send a message to every active clients." << endl;
             }
         }
 
@@ -99,8 +99,8 @@ void treat_command(const std::string& command)
             {
                 if(args[1] == "server")
                 {
-                    std::cout << "[Command] Server currently running at port : " << SERVER_PORT << "."      << std::endl
-                              << "[Command] Number of connected clients : " << server.clients.size() << "." << std::endl;
+                    cout << "[Command] Server currently running at port : " << server.port << "."      << endl;
+                    cout << "[Command] Number of connected clients : " << server.clients.size() << "." << endl;
                     return;
                 }
                 else if(args[1] == "client" && args.size() > 2)
@@ -108,10 +108,10 @@ void treat_command(const std::string& command)
                     client_t* info = server_find_client_by_name(&server, args[2]);
                     if(info)
                     {
-                        std::cout << "[Command] Client " << info->name << " currently connected."                                                                    << std::endl
-                                  << "[Command] Client adress : " << inet_ntoa(info->address.sin_addr) << ":" << ntohs(info->address.sin_port) << "."                << std::endl;
+                        cout << "[Command] Client " << info->name << " currently connected."                                                     << endl;
+                        cout << "[Command] Client adress : " << inet_ntoa(info->address.sin_addr) << ":" << ntohs(info->address.sin_port) << "." << endl;
                         if(info->mirror != NULL)
-                        std::cout << "[Command] Client mirror : " << inet_ntoa(info->mirror->address.sin_addr) << ":" << ntohs(info->mirror->address.sin_port) << "." << std::endl;
+                        cout << "[Command] Client mirror : " << inet_ntoa(info->mirror->address.sin_addr) << ":" << ntohs(info->mirror->address.sin_port) << "." << endl;
 
                         return;
                     }
@@ -120,11 +120,11 @@ void treat_command(const std::string& command)
 
             else
             {
-                std::cout << "[Command]<help> info [type] [client name]"                                      << std::endl;
-                std::cout << "[Command]<help> Display information about given connection."                    << std::endl;
-                std::cout << "[Command]<help> Type might be :"                                                << std::endl;
-                std::cout << "[Command]<help>   - 'server' : displays information about this server."         << std::endl;
-                std::cout << "[Command]<help>   - 'client' : displays information about given active client." << std::endl;
+                cout << "[Command]<help> info [type] [client name]"                                      << endl;
+                cout << "[Command]<help> Display information about given connection."                    << endl;
+                cout << "[Command]<help> Type might be :"                                                << endl;
+                cout << "[Command]<help>   - 'server' : displays information about this server."         << endl;
+                cout << "[Command]<help>   - 'client' : displays information about given active client." << endl;
             }
         }
 
@@ -142,8 +142,8 @@ void treat_command(const std::string& command)
 
             else
             {
-                std::cout << "[Command]<help> sendfile [client name] [file path]" << std::endl;
-                std::cout << "[Command]<help> Send given file to given client."   << std::endl;
+                cout << "[Command]<help> sendfile [client name] [file path]" << endl;
+                cout << "[Command]<help> Send given file to given client."   << endl;
             }
         }
 
@@ -158,13 +158,13 @@ void treat_command(const std::string& command)
                 client_t* new_client = nullptr;
                 server_init_client_connection(&server, new_client, adress.c_str(), port);
                 if(!new_client)
-                    std::cout << "[Command] Can't initialize new client connection (adress='" << adress << "', port=" << port << ")." << std::endl;
+                    cout << "[Command] Can't initialize new client connection (adress='" << adress << "', port=" << port << ")." << endl;
             }
 
             else
             {
-                std::cout << "[Command]<help> openclient [IP adress] [port]" << std::endl;
-                std::cout << "[Command]<help> Open a new connection to given adress and port." << std::endl;
+                cout << "[Command]<help> openclient [IP adress] [port]" << endl;
+                cout << "[Command]<help> Open a new connection to given adress and port." << endl;
             }
         }
 
@@ -176,14 +176,39 @@ void treat_command(const std::string& command)
                 server_end_client(&server, name);
             }
         }
+        
+        else if(args[0] == "userlogin")
+		{
+			if(args.size() > 2)
+			{
+				std::string username = args[1];
+				std::string pass     = args[2];
+				int err = user_create(server.logged_user, username, pass);
+				if(err == GERROR_NONE) {
+					server.logged = true;
+					cout << "[Command] Logged as '" << username << "'." << endl;
+				}
+				else
+				{
+					cout << "[Command] Error logging you in (" << gerror_to_string(err) << ")." << endl;
+				}
+			}
+		}
+		
+		else if(args[0] == "userunlog")
+		{
+			user_destroy(server.logged_user);
+			server.logged = false;
+			cout << "[Command] Logged as 'null'." << endl;
+		}
     }
 }
 
 void bytes_callback(const std::string& name, size_t current, size_t total)
 {
-    std::cout << "\r " << name << " : ";
-    std::cout << current << " \\ " << total << "bytes";
-    std::cout << " |";
+    cout << "\r " << name << " : ";
+    cout << current << " \\ " << total << "bytes";
+    cout << " |";
 
     size_t chunk_total = 30;
     size_t sz_for_one  = total / chunk_total;
@@ -191,48 +216,58 @@ void bytes_callback(const std::string& name, size_t current, size_t total)
     size_t blanck_num  = chunk_total - chunk_num;
 
     for(size_t i = 0; i < chunk_num; ++i)
-        std::cout << "#";
+        cout << "#";
     for(size_t i = 0; i < blanck_num; ++i)
-        std::cout << " ";
+        cout << " ";
 
-    std::cout << "| ";
+    cout << "| ";
     size_t perc = (100 * chunk_num) / chunk_total;
-    std::cout << perc << "%";
+    cout << perc << "%";
 }
 
 void display_help()
 {
-    std::cout << "GangTella is a free communication Project based on The Gang ideas by Luk2010." << std::endl;
-    std::cout << "This program is FREE SOFTWARE and is distributed with NO WARRANTY. If you have any kind of problems with it, "
-              << "you can send a mail to 'alain.ratatouille@gmail.com' (for suggestions it is the same adress :) ) . " << std::endl
-              << "Uses : gangtella [options]" << std::endl
-              << "Options : " << std::endl
-              << " --s-port      : Specify a custom port for the Server."             << std::endl
-              << "                 Default is 8377."                                  << std::endl
-              << " --s-name      : Specify a custom name for the Server. This name "  << std::endl
-              << "                 shown to every one who connect to this server."    << std::endl
-              << " --c-adress    : Specify the IP adress for the automated"           << std::endl
-              << "                 created client. Default is 127.0.0.1 (for test)."  << std::endl
-              << " --c-port      : Specify a port for the automated created client."  << std::endl
-              << "                 Default is 8378."                                  << std::endl
-              << " --no-client   : Specify the program not to create a client at the" << std::endl
-              << "                 beginning. This option is cool when you do not "   << std::endl
-              << "                 test the program."                                 << std::endl
-              << " --max-clients : Specify a max number of clients. Default is 10."   << std::endl
-              << " --max-buffer  : Specify the Maximum buffer size for a packet. "    << std::endl
-              << "                 Default is 1096."                                  << std::endl
-              << " --help        : Show this text."                                   << std::endl;
+    cout << "GangTella is a free server&client connector to the Gang Network." << endl;
+    cout << "This program is FREE SOFTWARE and is distributed with NO WARRANTY." << endl;
+    cout << "If you have any kind of problems with it, " << endl;
+	cout << "you can send a mail to 'alain.ratatouille@gmail.com' (for suggestions it is the same adress :) ) . " << endl; cout
+	     << "Uses    : gangtella [options]" << endl; cout
+		 << "Options : " << endl; cout
+			<< " --s-port      : Specify a custom port for the Server."             << endl; cout
+			<< "                 Default is 8377."                                  << endl; cout
+			<< " --s-name      : Specify a custom name for the Server. This name "  << endl; cout
+			<< "                 is shown to every one who connect to this server." << endl; cout
+			<< " --c-adress    : Specify the IP adress for the automated"           << endl; cout
+			<< "                 created client. Default is 127.0.0.1 (for test)."  << endl; cout
+			<< " --c-port      : Specify a port for the automated created client."  << endl; cout
+			<< "                 Default is 8378."                                  << endl; cout
+			<< " --no-client   : Specify the program not to create a client at the" << endl; cout
+			<< "                 beginning. This option is cool when you do not "   << endl; cout
+			<< "                 test the program."                                 << endl; cout
+			<< " --max-clients : Specify a max number of clients. Default is 10."   << endl; cout
+			<< " --max-buffer  : Specify the Maximum buffer size for a packet. "    << endl; cout
+			<< "                 Default is 1096."                                  << endl; cout
+			<< " --help        : Show this text."                                   << endl; cout
+			<< " --usr-help    : Show a help text on how to connect to the Network."<< endl; cout
+			<< " --version     : Show the version number."                          << endl;
+}
 
-    std::cout << "License : " << std::endl
-              << "GangTella  Copyright (C) 2014  Luk2010" << std::endl
-              << "This program comes with ABSOLUTELY NO WARRANTY." << std::endl
-              << "This is free software, and you are welcome to redistribute it" << std::endl
-              << "under certain conditions." << std::endl;
+void display_user_help()
+{
+	cout << "GangTella is a free server&client connector to the Gang Network." << endl;
+    cout << "This program is FREE SOFTWARE and is distributed with NO WARRANTY." << endl;
+    cout << "If you have any kind of problems with it, " << endl;
+	cout << "you can send a mail to 'alain.ratatouille@gmail.com' (for suggestions it is the same adress :) ) . " << endl; cout
+		 << "User connection : You need a password and a username. Then, it will connect to the nearest " << endl; cout
+		 << "trusted server wich will approve (if it knows you) or disapprove you to enter the network." << endl; 
 }
 
 int main(int argc, char* argv[])
 {
-    std::cout << "GangTella v." << GANGTELLA_VERSION << "."  << std::endl;
+    cout << "GangTella v." << GANGTELLA_VERSION << "."  << endl;
+
+    // Init OpenSSL
+    Encryption::Init();
 
     // Argues
 
@@ -285,18 +320,27 @@ int main(int argc, char* argv[])
             display_help();
             return 0;
         }
+        else if(std::string("--usr-help") == argv[i])
+		{
+			display_user_help();
+			return 0;
+		}
+		else if(std::string("--version") == argv[i])
+		{
+			return 0;
+		}
     }
 
 #ifdef GULTRA_DEBUG
-    std::cout << "[Main] Server Name   = '" << server_name << "'." << std::endl;
-    std::cout << "[Main] Server Port   = '" << server_port << "'." << std::endl;
+    cout << "[Main] Server Name   = '" << server_name << "'." << endl;
+    cout << "[Main] Server Port   = '" << server_port << "'." << endl;
     if(with_client) {
-    std::cout << "[Main] Client Adress = '" << client_adress << "'." << std::endl;
-    std::cout << "[Main] Client Port   = '" << client_port << "." << std::endl;
+    cout << "[Main] Client Adress = '" << client_adress << "'." << endl;
+    cout << "[Main] Client Port   = '" << client_port << "." << endl;
     }
 
-    std::cout << "[Main] Server Max Client = '" << server_max_clients << "'." << std::endl;
-    std::cout << "[Main] Server Max Buffer = '" << server_max_bufsize << "'." << std::endl;
+    cout << "[Main] Server Max Client = '" << server_max_clients << "'." << endl;
+    cout << "[Main] Server Max Buffer = '" << server_max_bufsize << "'." << endl;
 
 #endif // GULTRA_DEBUG
 
@@ -309,10 +353,10 @@ int main(int argc, char* argv[])
 #endif // GULTRA_DEBUG
 
     // Creation thread serveur
-    std::cout << "[Main] Creating Server thread." << std::endl;
+    cout << "[Main] Creating Server thread." << endl;
     if(server_launch(&server) != GERROR_NONE)
     {
-        std::cerr << "[Main] Couldn't launch server !!! Aborting." << std::endl;
+        std::cerr << "[Main] Couldn't launch server !!! Aborting." << endl;
         return 0;
     }
 
@@ -323,7 +367,7 @@ int main(int argc, char* argv[])
     // Creation du client de test
     if(with_client)
     {
-        std::cout << "[Main] Initializing client." << std::endl;
+        cout << "[Main] Initializing client." << endl;
         client_t* tmp = nullptr; server_init_client_connection(&server, tmp, client_adress.c_str(), client_port);
     }
 
@@ -334,12 +378,12 @@ int main(int argc, char* argv[])
     while(1)
     {
         char buf[server_max_bufsize];
-        std::cout << ":> ";
+        cout << ":> "; gthread_mutex_unlock(&__console_mutex);
         std::cin.getline(buf, server_max_bufsize - 1);
         tmp = buf;
         if(tmp == "exit")
         {
-            std::cout << "[Main] Exiting." << std::endl;
+            cout << "[Main] Exiting." << endl;
             pthread_cancel(server.thread);
             server_destroy(&server);
             break;
@@ -350,6 +394,6 @@ int main(int argc, char* argv[])
         }
     }
 
-    std::cout << "[Main] Goodbye." << std::endl;
+    cout << "[Main] Goodbye." << endl;
     return 0;
 }

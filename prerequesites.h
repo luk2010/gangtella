@@ -30,9 +30,9 @@
 #define GVERSION_MIN   "1"
 
 #ifdef _DEBUG
-#define GVERSION_BUILD "1d"
+#define GVERSION_BUILD "2d"
 #else
-#define GVERSION_BUILD "1"
+#define GVERSION_BUILD "2"
 #endif // _DEBUG
 
 #define GANGTELLA_VERSION GVERSION_MAJ "." GVERSION_MIN "." GVERSION_BUILD
@@ -59,6 +59,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <map>
+#include <sstream>
 
 // Comment tis line if you do not want the encryption module.
 // THIS IS VERY RECOMMENDED TO KEEP IT
@@ -67,6 +68,7 @@
 #ifdef GENCRYPT_RSA
 #   include <openssl/rsa.h>
 #endif // GENCRYPT_RSA
+#include <openssl/evp.h>
 
 /* ******************************************************************* */
 
@@ -140,6 +142,7 @@ STATIC_ASSERT(sizeof(double)   == 8, invalid_double_size);
 #define SERVER_PORT          8378 // Where other client will connect
 #define SERVER_MAXCLIENTS    10
 #define SERVER_MAXBUFSIZE    1024
+#define SERVER_MAXKEYSIZE    EVP_MAX_KEY_LENGTH + EVP_MAX_IV_LENGTH + 100
 #define RSA_SIZE             256  // Size of chunk in RSA. Data must be 256 - 11 size.
 
 #ifdef _DEBUG
@@ -185,8 +188,13 @@ typedef enum GError
     GERROR_ENCRYPT_BIOREAD   = 19,
     GERROR_ENCRYPT_WRITE     = 20,
     GERROR_INVALID_PACKET    = 21,
+    GERROR_USR_NODB          = 22,
+    GERROR_USR_NOKEY         = 23,
+    GERROR_USR_BADPSWD       = 24,
+    GERROR_BADCIPHER         = 25,
+    GERROR_EVPBTKFAILURE     = 26,
 
-    GERROR_MAX               = 22  // Number of errors
+    GERROR_MAX               = 27  // Number of errors
 } GError;
 typedef int gerror_t;
 
@@ -221,6 +229,16 @@ typedef struct {
 } buffer_t;
 
 gerror_t buffer_copy(buffer_t& dest, const buffer_t& src);
+
+// Threaded log
+
+using std::cout;
+using std::endl;
+extern pthread_mutex_t __console_mutex;
+
+#define cout  gthread_mutex_lock(&__console_mutex); cout
+#define endl  endl; gthread_mutex_unlock(&__console_mutex)
+#define ecout ""; gthread_mutex_unlock(&__console_mutex)
 
 GEND_DECL
 

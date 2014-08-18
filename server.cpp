@@ -29,6 +29,16 @@ GBEGIN_DECL
 
 #define ID_CLIENT_INVALID 0
 
+typedef struct {
+	std::string                   dbname;   // Database name.
+	std::string                   dbfile;   // Database file.
+	bool                          autosave; // True if database is saved when destroyed or reloaded.
+	std::map<std::string, user_t> users;    // Users in the database, with their user_t struct.
+	
+} user_db_t;
+
+user_db_t* udatabase = nullptr;
+
 void* server_thread_loop (void*);
 
 /** @brief Find the index of a client. */
@@ -47,7 +57,7 @@ int server_find_client_index_private_(server_t* server, const std::string& name)
     return -1;
 }
 
-/** @brief Generate aa new id for given server. */
+/** @brief Generate a new id for given server. */
 uint32_nt server_generate_new_id(server_t* server)
 {
     static uint32_t ret2 = 1;
@@ -72,6 +82,55 @@ uint32_nt server_generate_new_id(server_t* server)
     return ret;
 }
 
+/** @brief Create the home page. */
+std::string server_http_compute_home(server_t* server)
+{
+    std::string homepage;
+    std::stringstream hp(homepage);
+    hp << "<!DOCTYPE html>"
+       << "<html>"
+       << "  <head>"
+       << "    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"> "
+       << "    <title>Server " << server->name << " Home</title>"
+       << "  </head>"
+       << "  <body>"
+       << "    <h1>" << server->name << " Home</h1>"
+       << "  </body>"
+       << "</html>";
+    return hp.str();
+}
+
+std::string server_http_get_page(server_t* server, HttpRequestPacket* packet)
+{
+    std::string reqraw(packet->request);
+    std::string page_needed("");
+    if(!reqraw.empty())
+    {
+        for(std::string::const_iterator it = reqraw.begin(); it != reqraw.end(); ++it)
+        {
+            if(*(it+0) == 'G' &&
+               *(it+1) == 'E' &&
+               *(it+2) == 'T')
+            {
+                it++; it++; it++;
+
+                while(*it == ' ') it++;
+                while(*it != ' ') {
+                    page_needed += *it;
+                    it++;
+                }
+            }
+        }
+
+        if(page_needed == "/" || page_needed == "/home.html")
+        {
+            return server_http_compute_home(server);
+        }
+    }
+
+    return std::string("Bad Request !");
+}
+
 /** @brief Initialize the default parameters of the server_t structure.
  *
  *  @note A RSA assymetric key is created during the process. The public key
@@ -92,8 +151,8 @@ gerror_t server_create(server_t* server, const std::string& disp_name)
         return GERROR_BADARGS;
 
 #ifdef GULTRA_DEBUG
-    std::cout << "[Server] Creating server at adress : '" << (uint32_t) server << "'." << std::endl;
-    std::cout << "[Server] Name = '" << disp_name << "'." << std::endl;
+    cout << "[Server] Creating server at adress : '" << (uint32_t) server << "'." << endl;
+    cout << "[Server] Name = '" << disp_name << "'." << endl;
 #endif // GULTRA_DEBUG
 
     server->mutex   = PTHREAD_MUTEX_INITIALIZER;
@@ -102,13 +161,13 @@ gerror_t server_create(server_t* server, const std::string& disp_name)
     server->crypt   = nullptr;
 
 #ifdef GULTRA_DEBUG
-    std::cout << "[Server] Creating RSA encryption key." << std::endl;
+    cout << "[Server] Creating RSA encryption key." << endl;
 #endif // GULTRA_DEBUG
 
     gerror_t err = Encryption::encryption_create(server->crypt);
 
 #ifdef GULTRA_DEBUG
-    std::cout << "[Server] encryption_create return '" << gerror_to_string(err) << "'." << std::endl;
+    cout << "[Server] encryption_create return '" << gerror_to_string(err) << "'." << endl;
 #endif // GULTRA_DEBUG
 
     server->pubkey       = new buffer_t;
@@ -116,7 +175,7 @@ gerror_t server_create(server_t* server, const std::string& disp_name)
     if( (err = Encryption::encryption_get_publickey(server->crypt, server->pubkey)) != GERROR_NONE)
     {
 #ifdef GULTRA_DEBUG
-        std::cout << "[Server] Public Key Error : '" << gerror_to_string(err) << "'." << std::endl;
+        cout << "[Server] Public Key Error : '" << gerror_to_string(err) << "'." << endl;
 #endif // GULTRA_DEBUG
         delete server->pubkey;
     }
@@ -125,12 +184,31 @@ gerror_t server_create(server_t* server, const std::string& disp_name)
     server_setsendpolicy(server, SP_NORMAL);
 
 #ifdef GULTRA_DEBUG
-    std::cout << "[Server] Key lenght = " << server->pubkey->size << "." << std::endl;
-    std::cout << "[Server] Public key = '" << std::string(reinterpret_cast<char*>(server->pubkey->buf), server->pubkey->size) << "'." << std::endl;
+    cout << "[Server] Key lenght = " << server->pubkey->size << "." << endl;
+    cout << "[Server] Public key = '" << std::string(reinterpret_cast<char*>(server->pubkey->buf), server->pubkey->size) << "'." << endl;
 #endif // GULTRA_DEBUG
 
-    std::cout << "[Server] Correctly created." << std::endl;
-    std::cout << "[Server] RSA size = " << RSA_size(server->crypt->keypair) << std::endl;
+	cout << "[Server] Setting up database." << endl;
+	
+	std::ifstream indb("users.gtl");
+	if(!indb)
+	{
+		cout << "[Server] Can't find defaut database. Creating new." << endl;
+		udatabase = new user_db_t;
+		udatabase->autosave = true;
+		udatabase->dbfile   = "users.gtl";
+		udatabase->dbname   = "default";
+	}
+	else
+	{
+		indb.close();
+		user_database_load("users.gtl");
+	}
+	
+	server->logged = false;
+
+    cout << "[Server] Correctly created." << endl;
+    cout << "[Server] RSA size = " << RSA_size(server->crypt->keypair) << endl;
 
     return GERROR_NONE;
 }
@@ -161,14 +239,14 @@ int server_initialize(server_t* server, size_t port, int maxclients)
 
     if(maxclients == 0)
     {
-        std::cout << "[Server] Why initializing a server with 0 maximum clients ?!" << std::endl;
+        cout << "[Server] Why initializing a server with 0 maximum clients ?!" << endl;
         return GERROR_BADARGS;
     }
 
 #ifdef _WIN32
 
 #ifdef GULTRA_DEBUG
-    std::cout << "[Server] Starting WSA2.0." << std::endl;
+    cout << "[Server] Starting WSA2.0." << endl;
 #endif // GULTRA_DEBUG
 
     int err;
@@ -176,32 +254,32 @@ int server_initialize(server_t* server, size_t port, int maxclients)
     err = WSAStartup(MAKEWORD(2, 0), &wsadata);
     if(err == WSASYSNOTREADY)
     {
-        std::cout << "[Server] Could not start Windows Socket : "
-                  << "The underlying network subsystem is not ready for network communication." << std::endl;
+        cout << "[Server] Could not start Windows Socket : "
+                  << "The underlying network subsystem is not ready for network communication." << endl;
         return GERROR_WSASTARTUP;
     }
     else if(err == WSAVERNOTSUPPORTED)
     {
-        std::cout << "[Server] Could not start Windows Socket : "
-                  << "The version of Windows Sockets support requested is not provided by this particular Windows Sockets implementation." << std::endl;
+        cout << "[Server] Could not start Windows Socket : "
+                  << "The version of Windows Sockets support requested is not provided by this particular Windows Sockets implementation." << endl;
         return GERROR_WSASTARTUP;
     }
     else if(err == WSAEINPROGRESS)
     {
-        std::cout << "[Server] Could not start Windows Socket : "
-                  << "A blocking Windows Sockets 1.1 operation is in progress." << std::endl;
+        cout << "[Server] Could not start Windows Socket : "
+                  << "A blocking Windows Sockets 1.1 operation is in progress." << endl;
         return GERROR_WSASTARTUP;
     }
     else if(err == WSAEPROCLIM)
     {
-        std::cout << "[Server] Could not start Windows Socket : "
-                  << "A limit on the number of tasks supported by the Windows Sockets implementation has been reached." << std::endl;
+        cout << "[Server] Could not start Windows Socket : "
+                  << "A limit on the number of tasks supported by the Windows Sockets implementation has been reached." << endl;
         return GERROR_WSASTARTUP;
     }
     else if(err == WSAEFAULT)
     {
-        std::cout << "[Server] Could not start Windows Socket : "
-                  << "The lpWSAData parameter is not a valid pointer." << std::endl;
+        cout << "[Server] Could not start Windows Socket : "
+                  << "The lpWSAData parameter is not a valid pointer." << endl;
         return GERROR_WSASTARTUP;
     }
 
@@ -211,7 +289,7 @@ int server_initialize(server_t* server, size_t port, int maxclients)
     {
 
 #ifdef GULTRA_DEBUG
-        std::cout << "[Server] Initializing Server on port '" << port << "'." << std::endl;
+        cout << "[Server] Initializing Server on port '" << port << "'." << endl;
 #endif // GULTRA_DEBUG
 
         server->clients.reserve(maxclients);
@@ -219,7 +297,7 @@ int server_initialize(server_t* server, size_t port, int maxclients)
 
         if(server->sock == INVALID_SOCKET)
         {
-            std::cerr << "[Server] Invalid server creation ! (Socket invalid)" << std::endl;
+            std::cerr << "[Server] Invalid server creation ! (Socket invalid)" << endl;
             gthread_mutex_unlock(&server->mutex);
             return GERROR_INVALID_SOCKET;
         }
@@ -230,7 +308,7 @@ int server_initialize(server_t* server, size_t port, int maxclients)
         sin.sin_port        = htons(port);
         if(bind(server->sock, (SOCKADDR*) &sin, sizeof(sin) ) == SOCKET_ERROR)
         {
-            std::cerr << "[Server] Invalid server creation ! (Can't bind socket on port : " << port << ".)" << std::endl;
+            std::cerr << "[Server] Invalid server creation ! (Can't bind socket on port : " << port << ".)" << endl;
 
             closesocket(server->sock);
             gthread_mutex_unlock(&server->mutex);
@@ -239,14 +317,14 @@ int server_initialize(server_t* server, size_t port, int maxclients)
 
         if(listen(server->sock, maxclients) == SOCKET_ERROR)
         {
-            std::cerr << "[Server] Invalid server creation ! (Can't listen to clients.)" << std::endl;
+            std::cerr << "[Server] Invalid server creation ! (Can't listen to clients.)" << endl;
 
             closesocket(server->sock);
             gthread_mutex_unlock(&server->mutex);
             return GERROR_INVALID_LISTENING;
         }
 
-        std::cout << "[Server] Ready to listen on port '" << port << "'." << std::endl;
+        cout << "[Server] Ready to listen on port '" << port << "'." << endl;
         server->started = true;
         server->port    = port;
     }
@@ -270,7 +348,7 @@ gerror_t server_launch(server_t* server)
         return GERROR_BADARGS;
 
 #ifdef GULTRA_DEBUG
-    std::cout << "[Server] Launching server thread." << std::endl;
+    cout << "[Server] Launching server thread." << endl;
 #endif // GULTRA_DEBUG
 
     int ret = pthread_create(&server->thread, NULL, server_thread_loop, server);
@@ -296,7 +374,7 @@ gerror_t server_destroy(server_t* server)
     if(!server)
     {
 #ifdef GULTRA_DEBUG
-        std::cout << "[Server] Can't destroy null server." << std::endl;
+        cout << "[Server] Can't destroy null server." << endl;
 #endif // GULTRA_DEBUG
         return GERROR_BADARGS;
     }
@@ -347,33 +425,38 @@ gerror_t server_destroy(server_t* server)
 #ifdef _WIN32
 
 #ifdef GULTRA_DEBUG
-    std::cout << "[Server] Cleaning Windows Socket 2.0." << std::endl;
+    cout << "[Server] Cleaning Windows Socket 2.0." << endl;
 #endif // GULTRA_DEBUG
 
     int ret = WSACleanup();
 
     if(ret == WSANOTINITIALISED)
     {
-        std::cout << "[Server] Could not clean Windows Socket : "
-                  << "A successful WSAStartup call must occur before using this function." << std::endl;
+        cout << "[Server] Could not clean Windows Socket : "
+                  << "A successful WSAStartup call must occur before using this function." << endl;
         err = GERROR_WSACLEANING;
     }
     else if(ret == WSAENETDOWN)
     {
-        std::cout << "[Server] Could not clean Windows Socket : "
-                  << "The network subsystem has failed." << std::endl;
+        cout << "[Server] Could not clean Windows Socket : "
+                  << "The network subsystem has failed." << endl;
         err = GERROR_WSACLEANING;
     }
     else if(ret == WSAEINPROGRESS)
     {
-        std::cout << "[Server] Could not clean Windows Socket : "
-                  << "A blocking Windows Sockets 1.1 call is in progress, or the service provider is still processing a callback function." << std::endl;
+        cout << "[Server] Could not clean Windows Socket : "
+                  << "A blocking Windows Sockets 1.1 call is in progress, or the service provider is still processing a callback function." << endl;
         err = GERROR_WSACLEANING;
     }
 
 #endif // _WIN32
 
-    std::cout << "[Server] Server destroyed." << std::endl;
+	if(server->logged)
+		user_destroy(server->logged_user);
+
+	user_database_destroy();
+
+    cout << "[Server] Server destroyed." << endl;
 
     if(!gthread_mutex_unlock(&server->mutex))
         return GERROR_MUTEX_UNLOCK;
@@ -425,7 +508,7 @@ Packet* server_receive_packet(server_t* server, client_t* client)
     Packet* pclient = receive_client_packet(client->sock);
     if(!pclient)
     {
-        std::cout << "[Server] Invalid packet reception." << std::endl;
+        cout << "[Server] Invalid packet reception." << endl;
         if(server)
             server_end_client(server, client->name);
         else
@@ -440,7 +523,7 @@ Packet* server_receive_packet(server_t* server, client_t* client)
     {
         // We received encrypted data
 #ifdef GULTRA_DEBUG
-        std::cout << "[Server]{" << client->name << "} Receiving Encrypted data." << std::endl;
+        cout << "[Server]{" << client->name << "} Receiving Encrypted data." << endl;
 #endif // GULTRA_DEBUG
 
         // Verifying we have the public key
@@ -477,7 +560,7 @@ Packet* server_receive_packet(server_t* server, client_t* client)
                     Packet* vchunk = receive_client_packet(client->sock);
                     if(!vchunk || vchunk->m_type != PT_ENCRYPTED_CHUNK)
                     {
-                        std::cout << "[Server]{" << client->name << "} Can't receive Encrypted chunk !" << std::endl;
+                        cout << "[Server]{" << client->name << "} Can't receive Encrypted chunk !" << endl;
                         free(data);
                         free(cbuffer);
                         if(vchunk)
@@ -500,7 +583,7 @@ Packet* server_receive_packet(server_t* server, client_t* client)
 
                     // Infos
 #ifdef GULTRA_DEBUG
-                    std::cout << "[Server]{" << client->name << "} Decrypted " << decrypted << "/" << tot_sz << " bytes."  << std::endl;
+                    cout << "[Server]{" << client->name << "} Decrypted " << decrypted << "/" << tot_sz << " bytes."  << endl;
 #endif // GULTRA_DEBUG
                 }
 
@@ -526,13 +609,13 @@ Packet* server_receive_packet(server_t* server, client_t* client)
                 return cpacket;
 
 #ifdef GULTRA_DEBUG
-                std::cout << "[Server]{" << client->name << "} Received Encrypted Packet." << std::endl;
+                cout << "[Server]{" << client->name << "} Received Encrypted Packet." << endl;
 #endif // GULTRA_DEBUG
             }
         }
         else
         {
-            std::cout << "[Server]{" << client->name << "} Can't decrypt data without public key !" << std::endl;
+            cout << "[Server]{" << client->name << "} Can't decrypt data without public key !" << endl;
             return nullptr;
         }
     }
@@ -567,7 +650,7 @@ void* server_client_thread_loop(void* data)
             closesocket(client->sock);
             client->sock = 0;
 
-            std::cout << "[Server]{" << client->name << "} Closed client." << std::endl;
+            cout << "[Server]{" << client->name << "} Closed client." << endl;
 
             // Erasing client from vectors
             int cindex = server_find_client_index_private_(org, client->name);
@@ -587,12 +670,12 @@ void* server_client_thread_loop(void* data)
         {
             ClientMessagePacket* cmp = reinterpret_cast<ClientMessagePacket*>(pclient);
             std::string message = cmp->buffer;
-            std::cout << "[Server]{" << client->name << "} " << message << std::endl;
+            cout << "[Server]{" << client->name << "} " << message << endl;
             delete cmp;
         }
         else if(pclient->m_type == PT_CLIENT_ESTABLISHED)
         {
-            std::cout << "[Server]{" << client->name << "} Established connection." << std::endl;
+            cout << "[Server]{" << client->name << "} Established connection." << endl;
             delete pclient;
         }
 
@@ -602,7 +685,7 @@ void* server_client_thread_loop(void* data)
             ClientSendFileInfoPacket* csfip = reinterpret_cast<ClientSendFileInfoPacket*>(pclient);
             if(!csfip)
             {
-                std::cout << "[Server]{" << client->name << "} Error receiving File Info. " << std::endl;
+                cout << "[Server]{" << client->name << "} Error receiving File Info. " << endl;
                 delete pclient;
                 continue;
             }
@@ -615,14 +698,14 @@ void* server_client_thread_loop(void* data)
             bool        chunks = csfip->info.has_chunk;            // True if we have more than one chunk.
 
 
-            std::cout << "[Server]{" << client->name << "} Receiving file." << std::endl;
-            std::cout << "[Server]{" << client->name << "} File Name -> '" << fname << "'." << std::endl;
-            std::cout << "[Server]{" << client->name << "} File Size -> "  << flen  << "."  << std::endl;
+            cout << "[Server]{" << client->name << "} Receiving file." << endl;
+            cout << "[Server]{" << client->name << "} File Name -> '" << fname << "'." << endl;
+            cout << "[Server]{" << client->name << "} File Size -> "  << flen  << "."  << endl;
 #ifdef GULTRA_DEBUG
             if(chunks) {
-                std::cout << "[Server]{" << client->name << "} Chunk Len  -> " << clen << "." << std::endl;
-                std::cout << "[Server]{" << client->name << "} Chunk Last -> " << clsz << "." << std::endl;
-                std::cout << "[Server]{" << client->name << "} Chunk num  -> " << cnum << "." << std::endl;
+                cout << "[Server]{" << client->name << "} Chunk Len  -> " << clen << "." << endl;
+                cout << "[Server]{" << client->name << "} Chunk Last -> " << clsz << "." << endl;
+                cout << "[Server]{" << client->name << "} Chunk num  -> " << cnum << "." << endl;
             }
 #endif // GULTRA_DEBUG
 
@@ -636,7 +719,7 @@ void* server_client_thread_loop(void* data)
             if(!ofs)
             {
                 // We can't open the file so abort the operation
-                std::cout << "[Server]{" << client->name << "} Can't open file." << std::endl;
+                cout << "[Server]{" << client->name << "} Can't open file." << endl;
 
                 // This send a PT_ABORT_OPERATION packet wich signal the client it must abort the current operation
                 // because this server can't continue it.
@@ -650,7 +733,7 @@ void* server_client_thread_loop(void* data)
                 // We have cnum chunks to receive.
 
 #ifdef GULTRA_DEBUG
-                std::cout << "[Server]{" << client->name << "} Receiving File chunks." << std::endl;
+                cout << "[Server]{" << client->name << "} Receiving File chunks." << endl;
 #endif // GULTRA_DEBUG
 
                 uint32_t sz          = 0;        // Current bytes received (for bytes received callback)
@@ -664,7 +747,7 @@ void* server_client_thread_loop(void* data)
                     if(!vchunk)
                     {
                         // We can't receive the chunk, so close the stream and abort the operation.
-                        std::cout << "[Server]{" << client->name << "} Can't receive correct chunk." << std::endl;
+                        cout << "[Server]{" << client->name << "} Can't receive correct chunk." << endl;
                         ofs.close();
 
                         // This send a PT_ABORT_OPERATION packet wich signal the client it must abort the current operation
@@ -679,7 +762,7 @@ void* server_client_thread_loop(void* data)
                     if(!chunk)
                     {
                         // We can't reinterpret the vchunk.
-                        std::cout << "[Server]{" << client->name << "} Can't reinterpret correct chunk." << std::endl;
+                        cout << "[Server]{" << client->name << "} Can't reinterpret correct chunk." << endl;
                         delete vchunk;
                         ofs.close();
 
@@ -698,7 +781,7 @@ void* server_client_thread_loop(void* data)
                         mstop = true;
 
 #ifdef GULTRA_DEBUG
-                        std::cout << "[Server]{" << client->name << "} Written chunk nÂ°" << chunk_num << " -> " << clsz << " bytes." << std::endl;
+                        cout << "[Server]{" << client->name << "} Written chunk n¡ã" << chunk_num << " -> " << clsz << " bytes." << endl;
 #endif // GULTRA_DEBUG
 
                     }
@@ -710,7 +793,7 @@ void* server_client_thread_loop(void* data)
                         sz += clen;
 
 #ifdef GULTRA_DEBUG
-                        std::cout << "[Server]{" << client->name << "} Written chunk nÂ°" << chunk_num << " -> " << clen << " bytes." << std::endl;
+                        cout << "[Server]{" << client->name << "} Written chunk n¡ã" << chunk_num << " -> " << clen << " bytes." << endl;
 #endif // GULTRA_DEBUG
 
                     }
@@ -738,7 +821,7 @@ void* server_client_thread_loop(void* data)
                 if(!vchunk)
                 {
                     // We can't receive the chunk, so close the stream and abort the operation.
-                    std::cout << "[Server]{" << client->name << "} Can't receive correct chunk." << std::endl;
+                    cout << "[Server]{" << client->name << "} Can't receive correct chunk." << endl;
                     ofs.close();
 
                     // This send a PT_ABORT_OPERATION packet wich signal the client it must abort the current operation
@@ -753,7 +836,7 @@ void* server_client_thread_loop(void* data)
                 if(!chunk)
                 {
                     // We can't reinterpret the vchunk.
-                    std::cout << "[Server]{" << client->name << "} Can't reinterpret correct chunk." << std::endl;
+                    cout << "[Server]{" << client->name << "} Can't reinterpret correct chunk." << endl;
                     delete vchunk;
                     ofs.close();
 
@@ -768,7 +851,7 @@ void* server_client_thread_loop(void* data)
                 ofs.write(chunk->chunk, flen);
 
 #ifdef GULTRA_DEBUG
-                std::cout << "[Server] Written chunk -> " << flen << " bytes." << std::endl;
+                cout << "[Server] Written chunk -> " << flen << " bytes." << endl;
 #endif // GULTRA_DEBUG
 
                 if(org->br_callback)
@@ -821,15 +904,15 @@ void* server_thread_loop(void* __serv)
 
         if(csock == SOCKET_ERROR)
         {
-            std::cerr << "[Server] Can't accept client !" << std::endl;
+            std::cerr << "[Server] Can't accept client !" << endl;
             return (void*) errno;
         }
 
-        std::cout << "[Server] Receiving new Client connection." << std::endl;
+        cout << "[Server] Receiving new Client connection." << endl;
         Packet* pclient = receive_client_packet(csock);
         if(!pclient)
         {
-            std::cerr << "[Server] Client disconnected before establishing connection." << std::endl;
+            std::cerr << "[Server] Client disconnected before establishing connection." << endl;
             continue;
         }
         else
@@ -838,16 +921,16 @@ void* server_thread_loop(void* __serv)
             if(pclient->m_type == PT_CLIENT_INFO)
             {
 #ifdef GULTRA_DEBUG
-                std::cout << "[Server] Getting infos from new client." << std::endl;
+                cout << "[Server] Getting infos from new client." << endl;
 #endif // GULTRA_DEBUG
 
                 ClientInfoPacket* cip = reinterpret_cast<ClientInfoPacket*>(pclient);
 
 #ifdef GULTRA_DEBUG
-                std::cout << "[Server] ID     = '" << cip->info.id.data     << "'." << std::endl;
-                std::cout << "[Server] IDret  = '" << cip->info.idret.data  << "'." << std::endl;
-                std::cout << "[Server] Name   = '" << cip->info.name        << "'." << std::endl;
-                std::cout << "[Server] S Port = '" << cip->info.s_port.data << "'." << std::endl;
+                cout << "[Server] ID     = '" << cip->info.id.data     << "'." << endl;
+                cout << "[Server] IDret  = '" << cip->info.idret.data  << "'." << endl;
+                cout << "[Server] Name   = '" << cip->info.name        << "'." << endl;
+                cout << "[Server] S Port = '" << cip->info.s_port.data << "'." << endl;
 #endif // GULTRA_DEBUG
 
                 // If client send PT_CLIENT_INFO, this is a demand to create in our server a new client_t structure.   (idret == ID_CLIENT_INVALID)
@@ -873,7 +956,7 @@ void* server_thread_loop(void* __serv)
                     // We create the connection
                     if(client_create(new_client.mirror, inet_ntoa(csin.sin_addr), cip->info.s_port.data) != GERROR_NONE)
                     {
-                        std::cout << "[Server] Can't mirror connection to client '" << cip->info.name << "'." << std::endl;
+                        cout << "[Server] Can't mirror connection to client '" << cip->info.name << "'." << endl;
                         delete new_client.mirror;
                         continue;
                     }
@@ -889,7 +972,7 @@ void* server_thread_loop(void* __serv)
                     client_info_t serialized = serialize<client_info_t>(info);
                     if(client_send_packet(new_client.mirror, PT_CLIENT_INFO, &serialized, sizeof(serialized)) != GERROR_NONE)
                     {
-                        std::cout << "[Server] Can't send packet 'PT_CLIENT_INFO' to client '" << new_client.name << "'." << std::endl;
+                        cout << "[Server] Can't send packet 'PT_CLIENT_INFO' to client '" << new_client.name << "'." << endl;
 
                         // We so close the connection
                         client_close(new_client.mirror, true);
@@ -912,7 +995,7 @@ void* server_thread_loop(void* __serv)
                     server->client_send(cclient->mirror, PT_CLIENT_ESTABLISHED, NULL, 0);
 
                     // If everything is alright, we can tell user
-                    std::cout << "[Server] New Client connected (name = '" << cclient->name << "', id = '" << cclient->mirror->id.data << "')." << std::endl;
+                    cout << "[Server] New Client connected (name = '" << cclient->name << "', id = '" << cclient->mirror->id.data << "')." << endl;
                 }
 
                 else
@@ -927,8 +1010,8 @@ void* server_thread_loop(void* __serv)
                     buffer_copy(new_client->pubkey, cip->info.pubkey);
 
 #ifdef GULTRA_DEBUG
-                    std::cout << "[Server] Received Public Key from client '" << new_client->name << "' : " << std::endl;
-                    std::cout << std::string(reinterpret_cast<const char*>(new_client->pubkey.buf), new_client->pubkey.size) << std::endl;
+                    cout << "[Server] Received Public Key from client '" << new_client->name << "' : " << endl;
+                    cout << std::string(reinterpret_cast<const char*>(new_client->pubkey.buf), new_client->pubkey.size) << endl;
 #endif // GULTRA_DEBUG
 
                     // Once complete we create the thread
@@ -940,12 +1023,37 @@ void* server_thread_loop(void* __serv)
             }
             else if(pclient->m_type == PT_CLIENT_NAME)
             {
-                std::cout << "[Server] Packet 'PT_CLIENT_NAME' is deprecated. Please tell your client to update his GangTella application." << std::endl;
+                cout << "[Server] Packet 'PT_CLIENT_NAME' is deprecated. Please tell your client to update his GangTella application." << endl;
                 continue;
             }
+
+            // Client can also send an http request
+            else if(pclient->m_type == PT_HTTP_REQUEST)
+            {
+                HttpRequestPacket* request = reinterpret_cast<HttpRequestPacket*>(pclient);
+
+                // Compute page
+                std::string buf = server_http_get_page(server, request);
+                // Commpute header
+                std::string header;
+                std::stringstream hp(header);
+                hp << "HTTP/1.0 200 OK\r\n";
+                hp << "Server: Apache\r\n";
+                hp << "Content-lenght: " << buf.size() << "\r\n";
+                hp << "Content-Type: text/html\r\n";
+                hp << "\r\n";
+                hp << buf;
+
+                send(csock, hp.str().c_str(), hp.str().size(), 0);
+//                send(csock, buf.c_str(),      buf.size(),      0);
+                closesocket(csock);
+
+                delete request;
+            }
+
             else
             {
-                std::cerr << "Client didn't send correct packet ! ( " << (int) pclient->m_type << " )." << std::endl;
+                std::cerr << "Client didn't send correct packet ! ( " << (int) pclient->m_type << " )." << endl;
 //                delete pclient;
                 continue;
             }
@@ -1004,14 +1112,14 @@ gerror_t server_init_client_connection(server_t* server, client_t*& out, const c
 
     if(client_create(mirror, adress, port) != GERROR_NONE)
     {
-        std::cout << "[Server] Can't create client connection for adress '" << adress << ":" << (uint32_t) port << "'." << std::endl;
+        cout << "[Server] Can't create client connection for adress '" << adress << ":" << (uint32_t) port << "'." << endl;
 
         delete mirror;
         return GERROR_INVALID_CONNECT;
     }
 
 #ifdef GULTRA_DEBUG
-    std::cout << "[Server] Creating org client." << std::endl;
+    cout << "[Server] Creating org client." << endl;
 #endif // GULTRA_DEBUG
 
     // Once the mirror is created, we create the original client
@@ -1022,7 +1130,7 @@ gerror_t server_init_client_connection(server_t* server, client_t*& out, const c
     new_client.sock    = SOCKET_ERROR;
 
 #ifdef GULTRA_DEBUG
-    std::cout << "[Server] Registering org client." << std::endl;
+    cout << "[Server] Registering org client." << endl;
 #endif // GULTRA_DEBUG
 
     gthread_mutex_lock(&server->mutex);
@@ -1034,7 +1142,7 @@ gerror_t server_init_client_connection(server_t* server, client_t*& out, const c
     gthread_mutex_unlock(&server->mutex);
 
 #ifdef GULTRA_DEBUG
-    std::cout << "[Server] Sending client info." << std::endl;
+    cout << "[Server] Sending client info." << endl;
 #endif // GULTRA_DEBUG
 
     // On connection, server expects info of this client to be send.
@@ -1055,7 +1163,7 @@ gerror_t server_init_client_connection(server_t* server, client_t*& out, const c
     // packet to the client.
 
 #ifdef GULTRA_DEBUG
-    std::cout << "[Server] Client inited." << std::endl;
+    cout << "[Server] Client inited." << endl;
 #endif // GULTRA_DEBUG
 
     out = server->client_by_id[mirror->id.data];
@@ -1092,6 +1200,267 @@ void server_end_client(server_t* server, const std::string& client_name)
             gthread_mutex_unlock(&server->mutex);
         }
     }
+}
+
+/** @brief Create a user using password and name.
+ * 
+ *  If the current directory contains users.gtl file, it will read the user data from this 
+ *  file and verify that the password is correct.
+ *  If users.gtl does not exist, a new user is created using given pass and initializing with
+ *  a new initialization vector.
+ *
+ *  @note
+ *  You can also load a different database using user_database_load().
+ *  
+ *  @param user  : A reference to an allocated user structure.
+ *  @param uname : Name of the user to read into database. If no user is found, it creates a new
+ *  entry in the database.
+ *  @param upass : Password of the user to read into the database.
+ *
+ *  @return 
+ *  - GERROR_NONE        : No errors occured.
+ *  - GERROR_BADARGS     : uname or upass are empty.
+ *  - GERROR_USR_NODB    : No database loaded.
+ *  - GERROR_USR_NOKEY   : Can't create keypass.
+ *  - GERROR_USR_BADPSWD : Incorrect password.
+**/
+gerror_t user_create(user_t& user, const std::string& uname, const std::string& upass)
+{
+	if(uname.empty() || upass.empty())
+		return GERROR_BADARGS;
+	
+	if(!user_database_isloaded())
+		return GERROR_USR_NODB;
+		
+	if(udatabase->users.find(uname) == udatabase->users.end())
+	{
+		// Create new user in database
+		user.name = uname;
+		if(Encryption::user_create_keypass(user.key, user.iv, upass.c_str(), upass.size()) != GERROR_NONE)
+		{
+			// Can't create keypass, abort.
+			return GERROR_USR_NOKEY;
+		}
+		
+		// Everything turned right, new user is on !
+#ifdef GULTRA_DEBUG
+		cout << "[User] Correctly created user '" << uname << "'." << endl;
+#endif // GULTRA_DEBUG
+		
+		return GERROR_NONE;
+	}
+	
+	// We found user in database, so check password.
+		
+	if(Encryption::user_check_password(udatabase->users[uname].key, udatabase->users[uname].iv, upass.c_str(), upass.size()))
+	{
+		// Load user from database
+		user.name = uname;
+		user.key  = udatabase->users[uname].key;
+		user.iv   = udatabase->users[uname].iv;
+
+#ifdef GULTRA_DEBUG
+		cout << "[User] Correctly loaded user '" << uname << "'." << endl;
+#endif // GULTRA_DEBUG
+
+		return GERROR_NONE;
+	}
+	
+	// Password wrong, return.
+	return GERROR_USR_BADPSWD;
+}
+
+/** @brief Destroy a given user, and saves its data into the database.
+ *  
+ *  @param user : User to destroy. If an entry corresponding to this user
+ *  is already used, the fields name and signed_pass can't be changed (this
+ *  is for security purpose). If the entry doesn't exist, the user is saved directly
+ *  in the database.
+ *
+ *  @note
+ *  The user structure is invalid after this function. Every members is set to 0.
+ *
+ *  @return 
+ *  - GERROR_NONE    : No errors occured.
+ *  - GERROR_BADARGS : User is invalid.
+**/
+gerror_t user_destroy(user_t& user)
+{
+	if(user.name.empty() || user.key.empty())
+		return GERROR_BADARGS;
+	
+	// Find the user in the database
+	if(udatabase->users.find(user.name) == udatabase->users.end())
+	{
+		// We did not find the user : save it.
+		udatabase->users[user.name].name = user.name;
+		udatabase->users[user.name].key  = user.key;
+		udatabase->users[user.name].iv   = user.iv;
+	}
+	
+	user.name.clear();
+	user.key.clear();
+	user.iv.clear();
+	
+	// Everything went okay
+	return GERROR_NONE;
+}
+
+/** @brief Load a database with given name.
+ *  
+ *  The database must follow an exact pattern. You can export your database
+ *  using user_database_export(), and so import another database using this
+ *  function.
+ *
+ *  @note
+ *  Only one database can be used by server, and at server creation, database 
+ *  "users.gtl" is loaded by default.
+ *
+ *  @param dbname : Path to the database to load. It can be an absolute path or
+ *  a relative from the executable.
+ *
+ *  @return 
+ *  - GERROR_NONE         : No errors occured.
+ *  - GERROR_BADARGS      : Path is invalid.
+ *  - GERROR_CANTOPENFILE : Stream can't be opened.
+ *  - GERROR_IO_CANTREAD  : Stream can't read database data.
+**/
+gerror_t user_database_load(const std::string& dbname)
+{
+	if(dbname.empty())
+		return GERROR_BADARGS;
+		
+	if(udatabase)
+		user_database_destroy();
+	
+	std::ifstream indb(dbname.c_str());
+	if(!indb)
+		return GERROR_CANTOPENFILE;
+		
+	udatabase = new user_db_t;
+	std::string curr_word;
+
+	cout << "[User] Processing database '" << dbname << "'." << endl;
+	udatabase->dbfile = dbname;
+	while(indb >> curr_word)
+	{
+		if(curr_word == "[dbname]")
+		{
+			// Database name processing
+			indb >> udatabase->dbname;
+#ifdef GULTRA_DEBUG
+			cout << "[User] Name = '" << udatabase->dbname << "'." << endl;
+#endif // GULTRA_DEBUG
+		}
+		else if(curr_word == "[autosave]")
+		{
+			std::string boolean; indb >> boolean;
+			if(boolean == "true")
+				udatabase->autosave = true;
+			else
+				udatabase->autosave = false;
+#ifdef GULTRA_DEBUG
+			cout << "[User] Autosave = '" << boolean << "'." << endl;
+#endif // GULTRA_DEBUG
+		}
+		else if(curr_word == "[user]")
+		{
+			std::string uname, ukey, uiv;
+			indb >> uname >> ukey >> uiv;
+#ifdef GULTRA_DEBUG
+			cout << "[User] New user processed ('" << uname << "')." << endl;
+#endif // GULTRA_DEBUG
+
+			udatabase->users[uname].name = uname;
+			udatabase->users[uname].key  = ukey;
+			udatabase->users[uname].iv   = uiv;
+		}
+		else
+		{
+			cout << "[User] Bad keyword given in database '" << dbname << "' (" << curr_word << ")." << endl;
+		}
+	}
+
+	cout << "[User] Database '" << dbname << "' loaded." << endl;
+	return GERROR_NONE;
+}
+
+/** @brief Export a database to given filename.
+ *
+ *  Use this function to export your database giving you the
+ *  possibility to load it from any GangTella application.
+ *
+ *  @param dbname : File to save the database.
+ *
+ *  @return 
+ *  - GERROR_NONE         : No errors occured.
+ *  - GERROR_BADARGS      : Path is invalid or no database is
+ *  loaded.
+ *  - GERROR_CANTOPENFILE : File given can't be opened.
+**/
+gerror_t user_database_export(const std::string& dbname)
+{
+	if(dbname.empty() || !user_database_isloaded())
+		return GERROR_BADARGS;
+	
+	std::ofstream os(dbname.c_str());
+	if(!os)
+	{
+#ifdef GULTRA_DEBUG
+		cout << "[User] Can't open file '" << dbname << "' to export database !" << endl;
+#endif // GULTRA_DEBUG
+
+		return GERROR_CANTOPENFILE;
+	}
+	
+	// File is opened and database is ready to be exported. 
+#ifdef GULTRA_DEBUG
+	cout << "[User] Exporting database '" << udatabase->dbname << "' to file '" << dbname << "'." << endl;
+#endif // GULTRA_DEBUG
+
+	// Name
+	os << "[dbname] " << udatabase->dbname << "\n";
+	
+	// Autosave option
+	if(udatabase->autosave)
+		os << "[autosave] true\n";
+	else
+		os << "[autosave] false\n";
+	
+	// Users
+	std::map<std::string, user_t>::const_iterator e  = udatabase->users.end();
+	std::map<std::string, user_t>::iterator       it = udatabase->users.begin();
+	
+	for(; it != e; ++it)
+		os << "[user] " << it->first << " " << it->second.key << " " << it->second.iv << "\n";
+	
+	return GERROR_NONE;
+}
+
+/** @brief Returns true if database is loaded.
+**/
+bool user_database_isloaded()
+{
+	return !(udatabase == nullptr);
+}
+
+/** @brief Destroy the currently loaded database.
+ *  @note Database with 'autosave' option set to true will 
+ *  be re-exported to their appropriate file.
+ *
+ *  @return
+ *  - GERROR_NONE : No errors occured.
+**/
+gerror_t user_database_destroy()
+{
+	if(!user_database_isloaded())
+		return GERROR_NONE;
+	
+	if(udatabase->autosave)
+		user_database_export(udatabase->dbfile);
+	
+	delete udatabase;
+	return GERROR_NONE;
 }
 
 GEND_DECL

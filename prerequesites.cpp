@@ -6,6 +6,8 @@
 
 GBEGIN_DECL
 
+pthread_mutex_t __console_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 #ifdef _WIN32
 
 LARGE_INTEGER
@@ -118,25 +120,25 @@ bool gthread_mutex_lock(pthread_mutex_t* mutex)
         return true;
     else if(err == EINVAL)
     {
-        std::cout << "[GThread] Error locking mutex : "
-                  << "The value specified by mutex does not refer to an initialised mutex object." << std::endl;
+        cout << "[GThread] Error locking mutex : "
+                  << "The value specified by mutex does not refer to an initialised mutex object." << endl;
         return false;
     }
     else if(err == EAGAIN)
     {
-        std::cout << "[GThread] Error locking mutex : "
-                  << "The mutex could not be acquired because the maximum number of recursive locks for mutex has been exceeded." << std::endl;
+        cout << "[GThread] Error locking mutex : "
+                  << "The mutex could not be acquired because the maximum number of recursive locks for mutex has been exceeded." << endl;
         return false;
     }
     else if(err == EDEADLK)
     {
-        std::cout << "[GThread] Error locking mutex : "
-                  << "The current thread already owns the mutex." << std::endl;
+        cout << "[GThread] Error locking mutex : "
+                  << "The current thread already owns the mutex." << endl;
         return false;
     }
     else
     {
-        std::cout << "[GThread] Error locking mutex." << std::endl;
+        cout << "[GThread] Error locking mutex." << endl;
         return false;
     }
 }
@@ -148,7 +150,7 @@ bool gthread_mutex_unlock(pthread_mutex_t* mutex)
         return true;
     else
     {
-        std::cout << "[GThread] Error unlocking mutex." << std::endl;
+        cout << "[GThread] Error unlocking mutex." << endl;
         return false;
     }
 }
@@ -175,7 +177,12 @@ static const char* __errors [GERROR_MAX] = {
     "Error in BIO functions.",
     "Error reading bio.",
     "Error writing encryption.",
-    "Invalid Packet Type."
+    "Invalid Packet Type.",
+    "No user database loaded.",
+    "Can't create user keypass.",
+    "Incorrect password given.",
+    "Cipher requested not found.",
+    "(OpenSSL) EVP_BytesToKey failed."
 };
 
 const char* gerror_to_string(gerror_t& err)

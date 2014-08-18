@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1404743758 source:/home/luk2010/Projects/gangtella/main.cpp
+1408368681 source:/home/luk2010/Projects/gangtella/main.cpp
 	"prerequesites.h"
 	"commands.h"
 	"packet.h"
@@ -8,7 +8,7 @@
 
 1401869942 
 
-1404743896 /home/luk2010/Projects/gangtella/prerequesites.h
+1408368619 /home/luk2010/Projects/gangtella/prerequesites.h
 	<unistd.h>
 	<typeinfo>
 	<fstream>
@@ -24,7 +24,9 @@
 	<stdio.h>
 	<stdlib.h>
 	<map>
+	<sstream>
 	<openssl/rsa.h>
+	<openssl/evp.h>
 	<windows.h>
 	<winsock2.h>
 	<sys/types.h>
@@ -36,7 +38,7 @@
 
 1401869463 r.h"
 
-1404738576 /home/luk2010/Projects/gangtella/packet.h
+1404928161 /home/luk2010/Projects/gangtella/packet.h
 	"prerequesites.h"
 
 1401869024 ites.h"
@@ -44,30 +46,29 @@
 1404489803 /home/luk2010/Projects/gangtella/client.h
 	"prerequesites.h"
 
-1404489803 /home/luk2010/Projects/gangtella/server.h
+1408369651 /home/luk2010/Projects/gangtella/server.h
 	"prerequesites.h"
 	"client.h"
 	"encryption.h"
 	"packet.h"
 
-1404740244 source:/home/luk2010/Projects/gangtella/packet.cpp
+1407846499 source:/home/luk2010/Projects/gangtella/packet.cpp
 	"packet.h"
 
-1404562490 source:/home/luk2010/Projects/gangtella/client.cpp
+1404919160 source:/home/luk2010/Projects/gangtella/client.cpp
 	"packet.h"
 	"client.h"
 	"server.h"
 
-1404743199 source:/home/luk2010/Projects/gangtella/server.cpp
+1408371481 source:/home/luk2010/Projects/gangtella/server.cpp
 	"prerequesites.h"
 	"server.h"
 	"packet.h"
 
-1404489803 source:/home/luk2010/Projects/gangtella/prerequesites.cpp
+1407847205 source:/home/luk2010/Projects/gangtella/prerequesites.cpp
 	"prerequesites.h"
 
-1401869453 /home/luk2010/Projects/gangtella/serializer.h
-	"prerequesites.h"
+1404918916 /home/luk2010/Projects/gangtella/serializer.h
 	"prerequesites.h"
 
 1401869463 source:/home/luk2010/Projects/gangtella/serializer.cpp
@@ -256,17 +257,17 @@
 	"server.h"
 	"packet.h"
 
-1403109012 source:/home/luk2010/Projects/gangtella/commands.cpp
+1404919248 source:/home/luk2010/Projects/gangtella/commands.cpp
 	"commands.h"
 
-1404740731 /home/luk2010/Projects/gangtella/commands.h
+1404918753 /home/luk2010/Projects/gangtella/commands.h
 	"prerequesites.h"
 
-1404742940 source:/home/luk2010/Projects/gangtella/encryption.cpp
+1408371584 source:/home/luk2010/Projects/gangtella/encryption.cpp
 	"encryption.h"
 	<openssl/pem.h>
 
-1403272429 /home/luk2010/Projects/gangtella/encryption.h
+1408370992 /home/luk2010/Projects/gangtella/encryption.h
 	"prerequesites.h"
 
 1404487435 source:c:\users\luk2010\documents\github\gangtella\client.cpp

@@ -43,6 +43,7 @@ namespace Encryption
         buffer_t buf;
     } biobox_t;
 
+    gerror_t Init();
     gerror_t encryption_create(encryption_t*& out);
     gerror_t encryption_destroy(encryption_t* in);
     int      crypt(encryption_t* rsa, unsigned char* to, unsigned char* from, size_t flen);
@@ -54,6 +55,9 @@ namespace Encryption
     gerror_t bio_create_newbuffer(biobox_t* bio);
     gerror_t bio_destroy(biobox_t* bio);
     gerror_t bio_read_all(biobox_t* bio, buffer_t* out);
+    
+    gerror_t user_create_keypass(std::string& outkey, std::string& outiv, const char* passwd, size_t passwdsz);
+	bool	 user_check_password(std::string& inkey, std::string& iniv, const char* passwd, size_t passwdsz);
 }
 
 typedef Encryption::encryption_t crypt_t;

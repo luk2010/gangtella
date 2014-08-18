@@ -27,10 +27,13 @@ GBEGIN_DECL
 
 std::streambuf* coutbuf = nullptr;
 
+#undef cout
+#undef endl
+
 gerror_t console_set_output(std::ostream& os)
 {
-    coutbuf = std::cout.rdbuf();
-    std::cout.rdbuf(os.rdbuf());
+    coutbuf = cout.rdbuf();
+    cout.rdbuf(os.rdbuf());
 
     return GERROR_NONE;
 }
@@ -38,7 +41,7 @@ gerror_t console_set_output(std::ostream& os)
 gerror_t console_restore_output()
 {
     if(coutbuf)
-        std::cout.rdbuf(coutbuf);
+        cout.rdbuf(coutbuf);
 
     coutbuf = nullptr;
     return GERROR_NONE;

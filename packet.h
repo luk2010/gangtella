@@ -78,7 +78,8 @@ typedef enum PacketType {
     PT_CLIENT_SENDFILE_TERMINATE = 8,
     PT_CLIENT_INFO               = 9,
     PT_ENCRYPTED_INFO            = 10,
-    PT_ENCRYPTED_CHUNK           = 11
+    PT_ENCRYPTED_CHUNK           = 11,
+    PT_HTTP_REQUEST              = 12
 } PacketType;
 
 /** @brief A generic class representing a Packet.
@@ -248,6 +249,21 @@ public:
     size_t getPacketSize() const { return RSA_SIZE; }
 };
 typedef PacketPolicy<PT_ENCRYPTED_CHUNK> EncryptedChunkPacket;
+
+// ---------------------------------------
+
+template<>
+class PacketPolicy<PT_HTTP_REQUEST> : public Packet {
+public:
+    char request[SERVER_MAXBUFSIZE];
+
+    PacketPolicy() { m_type = PT_HTTP_REQUEST; }
+    ~PacketPolicy() {}
+
+    size_t getPacketSize() const { return SERVER_MAXBUFSIZE; }
+};
+typedef PacketPolicy<PT_HTTP_REQUEST> HttpRequestPacket;
+
 
 Packet* packet_choose_policy(const int type);
 gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size_t len);

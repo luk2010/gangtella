@@ -52,7 +52,7 @@ typedef union {
 
 template<class To, class From>
 To serialize(const From& src) {
-    std::cout << "[Serializer] No implementation found for template<" << typeid(To).name() << ", " << typeid(From).name() << ">." << std::endl;
+    cout << "[Serializer] No implementation found for template<" << typeid(To).name() << ", " << typeid(From).name() << ">." << endl;
 }
 
 template <> uint8_nt  serialize(const uint8_nt& );
@@ -63,7 +63,7 @@ template <> uint64_nt serialize(const uint64_nt&);
 
 template<class To, class From>
 To deserialize(const From& src) {
-    std::cout << "[Deserializer] No implementation found for template<" << typeid(To).name() << ", " << typeid(From).name() << ">." << std::endl;
+    cout << "[Deserializer] No implementation found for template<" << typeid(To).name() << ", " << typeid(From).name() << ">." << endl;
 }
 
 template <> uint8_nt  deserialize(const uint8_nt&);

@@ -126,6 +126,8 @@ Packet* packet_choose_policy(const int type)
         return new EncryptedInfoPacket();
     case PT_ENCRYPTED_CHUNK:
         return new EncryptedChunkPacket();
+    case PT_HTTP_REQUEST:
+        return new HttpRequestPacket();
     default:
         return new Packet();
     }
@@ -148,19 +150,38 @@ Packet* receive_client_packet(SOCKET sock)
     if(!sock)
         return NULL;
 
-    // Receive the PT_PACKETTYPE packet first.
     PacketTypePacket ptp;
-    int n = recv(sock, (char*) &ptp, ptp.getPacketSize(), 0);
-    if((unsigned int) n !=  ptp.getPacketSize())
+
+    // Receive data
+    data_t max_request[8196];
+    int n = recv(sock, max_request, sizeof(ptp), 0);
+
+    // Receive the PT_PACKETTYPE packet first.
+    memcpy(&ptp, max_request, sizeof(ptp));
+
+    if(ptp.m_type != PT_PACKETTYPE &&
+       n > 0)
     {
-        std::cerr << "Can't receive packet type from socket " << sock << "." << std::endl;
-        return NULL;
+        n = recv(sock, max_request + sizeof(ptp), 8196 - sizeof(ptp), 0);
+
+        // This might be an http request, so transform it to a
+        // HttpRequestPacket and receive all sending request.
+        HttpRequestPacket* retv = reinterpret_cast<HttpRequestPacket*>(packet_choose_policy(PT_HTTP_REQUEST));
+        // Copy data to buffer
+        memcpy(retv->request, (char*) max_request, n);
+
+#ifdef GULTRA_DEBUG
+        cout << "[Packet] HTTP Request size = " << n << endl;
+#endif // GULTRA_DEBUG
+
+        // Return it
+        return retv;
     }
 
     // We construct the packet depending on his type.
     Packet* packet = packet_choose_policy(ptp.type);
-    data_t* data = nullptr;
-    size_t len = packet->getPacketSize();
+    data_t* data   = nullptr;
+    size_t len     = packet->getPacketSize();
 
     if(len > 0)
     {
@@ -179,7 +200,7 @@ Packet* receive_client_packet(SOCKET sock)
 
         // Show the error
 #ifdef GULTRA_DEBUG
-        std::cout << "[Packet] Can't interpret packet : " << gerror_to_string(err) << std::endl;
+        cout << "[Packet] Can't interpret packet : " << gerror_to_string(err) << endl;
 #endif // GULTRA_DEBUG
     }
 
@@ -205,7 +226,6 @@ Packet* receive_client_packet(SOCKET sock)
  *  @return
  *  - GERROR_NONE on success
  *  - GERROR_BADARGS if one of the argues is invalid.
-
 **/
 gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size_t len)
 {
@@ -292,9 +312,7 @@ gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size
         return GERROR_NONE;
     }
 
-    std::cout << "[Packet] Unknown packet type received : '" << (uint32_t) type << "'.";
-
-    delete packet;
+    cout << "[Packet] Unknown packet type received : '" << (uint32_t) type << "'." << endl;
     return GERROR_INVALID_PACKET;
 }
 
@@ -313,7 +331,7 @@ gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size
  *  @param packet_type : Type of the packet to send.
  *  @param data        : Data to send, corresponding to the exact byte pattern
  *  of the packet.
- *  @param sz          : siz of the data to send.
+ *  @param sz          : size of the data to send.
  *
  *  @return
  *  - GERROR_NONE on success.
@@ -331,7 +349,7 @@ gerror_t send_client_packet(SOCKET sock, uint8_t packet_type, const void* data, 
     PacketTypePacket ptp(packet_type);
     if(send(sock, (data_t*) &ptp, ptp.getPacketSize(), 0) < 0)
     {
-        std::cout << "[Packet] Can't send PT_PACKETTYPE." << std::endl;
+        cout << "[Packet] Can't send PT_PACKETTYPE." << endl;
         return GERROR_CANT_SEND_PACKET;
     }
 
@@ -340,7 +358,7 @@ gerror_t send_client_packet(SOCKET sock, uint8_t packet_type, const void* data, 
     {
         if(send(sock, (data_t*) data, sz, 0) < 0)
         {
-            std::cerr << "[Packet] Can't send data packet." << std::endl;
+            std::cerr << "[Packet] Can't send data packet." << endl;
             return GERROR_CANT_SEND_PACKET;
         }
     }

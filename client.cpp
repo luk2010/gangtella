@@ -38,18 +38,18 @@ gerror_t client_create(client_t* client, const char* adress, size_t port)
 
     if(sock == INVALID_SOCKET)
     {
-        std::cerr << "[Client] Can't create socket !" << std::endl;
+        cout << "[Client] Can't create socket !" << endl;
         return GERROR_INVALID_SOCKET;
     }
 
 #ifdef GULTRA_DEBUG
-    std::cout << "[Client] Correctly created socket." << std::endl;
+    cout << "[Client] Correctly created socket." << endl;
 #endif // GULTRA_DEBUG
 
     hostinfo = gethostbyname(adress);
     if(hostinfo == NULL)
     {
-        std::cerr << "[Client] Unknown host " << adress << "." << std::endl;
+        cout << "[Client] Unknown host " << adress << "." << endl;
 
         closesocket(sock);
         return GERROR_INVALID_HOST;
@@ -60,19 +60,19 @@ gerror_t client_create(client_t* client, const char* adress, size_t port)
     sin.sin_family = AF_INET;
 
 #ifdef GULTRA_DEBUG
-    std::cout << "[Client] Correctly created hostinfo." << std::endl;
+    cout << "[Client] Correctly created hostinfo." << endl;
 #endif // GULTRA_DEBUG
 
     if(connect(sock, (SOCKADDR*) &sin, sizeof(SOCKADDR)) == SOCKET_ERROR)
     {
-        std::cerr << "[Client] Can't connect to host '" << adress << ":" << port << "'." << std::endl;
+        cout << "[Client] Can't connect to host '" << adress << ":" << port << "'." << endl;
 
         closesocket(sock);
         return GERROR_INVALID_CONNECT;
     }
 
-    std::cout << "[Client] Connected to host '" << adress << ":" << port << "'." << std::endl;
-    std::cout << "[Client] Name = '" << client->name << "'." << std::endl;
+    cout << "[Client] Connected to host '" << adress << ":" << port << "'." << endl;
+    cout << "[Client] Name = '" << client->name << "'." << endl;
     client->sock    = sock;
     client->address = sin;
 
@@ -102,7 +102,7 @@ gerror_t client_close(client_t* client, bool send_close_packet)
     }
 
 #ifdef GULTRA_DEBUG
-    std::cout << "[Client] Closed client '" << client->name << "'." << std::endl;
+    cout << "[Client] Closed client '" << client->name << "'." << endl;
 #endif // GULTRA_DEBUG
 
     return ret;
@@ -136,7 +136,7 @@ gerror_t client_send_cryptpacket(client_t* client, uint8_t packet_type, const vo
     }
 
 #ifdef GULTRA_DEBUG
-    std::cout << "[Client] Sending CryptPacket Info (Block Num = " << info.cryptedblock_number.data << ", LBS = " << info.cryptedblock_lastsz.data << ")." << std::endl;
+    cout << "[Client] Sending CryptPacket Info (Block Num = " << info.cryptedblock_number.data << ", LBS = " << info.cryptedblock_lastsz.data << ")." << endl;
 #endif // GULTRA_DEBUG
 
     // We send the info to client
@@ -162,7 +162,7 @@ gerror_t client_send_cryptpacket(client_t* client, uint8_t packet_type, const vo
             int len = Encryption::crypt(server->crypt, to, current, RSA_SIZE - 11);
 
 #ifdef GULTRA_DEBUG
-            std::cout << "[Client] Sending len = " << len << "bytes." << std::endl;
+            cout << "[Client] Sending len = " << len << "bytes." << endl;
 #endif // GULTRA_DEBUG
 
             client_send_packet(client, PT_ENCRYPTED_CHUNK, to, len);
@@ -172,7 +172,7 @@ gerror_t client_send_cryptpacket(client_t* client, uint8_t packet_type, const vo
         int len = Encryption::crypt(server->crypt, to, current, info.cryptedblock_lastsz.data);
 
 #ifdef GULTRA_DEBUG
-        std::cout << "[Client] Sending len = " << len << "bytes." << std::endl;
+        cout << "[Client] Sending len = " << len << "bytes." << endl;
 #endif // GULTRA_DEBUG
 
         client_send_packet(client, PT_ENCRYPTED_CHUNK, to, len);
@@ -181,7 +181,7 @@ gerror_t client_send_cryptpacket(client_t* client, uint8_t packet_type, const vo
         free(to);
 
 #ifdef GULTRA_DEBUG
-        std::cout << "[Client] Crypt Terminated." << std::endl;
+        cout << "[Client] Crypt Terminated." << endl;
 #endif // GULTRA_DEBUG
 
         return GERROR_NONE;
@@ -233,7 +233,7 @@ gerror_t client_send_file(client_t* client, const char* filename)
         const int lenght = is.tellg();
         is.seekg(0, is.beg);
 
-        std::cout << "[Client] Sending file '" << filename << "'." << std::endl;
+        cout << "[Client] Sending file '" << filename << "'." << endl;
 
 #ifdef GULTRA_DEBUG
         struct timespec st = timer_start();
@@ -251,16 +251,16 @@ gerror_t client_send_file(client_t* client, const char* filename)
             sft.name[flenght] = '\0';
 
 #ifdef GULTRA_DEBUG
-            std::cout << "[Client] Info : " << std::endl;
-            std::cout << "[Client] lenght      = " << lenght << "." << std::endl;
-            std::cout << "[Client] Chunk count = 1." << std::endl;
+            cout << "[Client] Info : " << endl;
+            cout << "[Client] lenght      = " << lenght << "." << endl;
+            cout << "[Client] Chunk count = 1." << endl;
 #endif // GULTRA_DEBUG
 
             sft = serialize<send_file_t>(sft);
             {
                 if(server->client_send(client, PT_CLIENT_SENDFILE_INFO, &sft, sizeof(struct send_file_t)) != GERROR_NONE)
                 {
-                    std::cout << "[Client] Error sending info packet !" << std::endl;
+                    cout << "[Client] Error sending info packet !" << endl;
 
                     is.close();
                     return GERROR_CANT_SEND_PACKET;
@@ -275,7 +275,7 @@ gerror_t client_send_file(client_t* client, const char* filename)
             is.read(data, lenght);
             if(!is)
             {
-                std::cout << "[Client] Can't read file '" << filename << "'." << std::endl;
+                cout << "[Client] Can't read file '" << filename << "'." << endl;
                 server->client_send(client, PT_CLIENT_SENDFILE_TERMINATE, NULL, 0);
 
                 is.close();
@@ -283,13 +283,13 @@ gerror_t client_send_file(client_t* client, const char* filename)
             }
 
 #ifdef GULTRA_DEBUG
-            std::cout << "[Client] Sending chunk (size : " << lenght << ", # = 1)." << std::endl;
+            cout << "[Client] Sending chunk (size : " << lenght << ", # = 1)." << endl;
 #endif // GULTRA_DEBUG
 
             // On envoie le tout
             if(server->client_send(client, PT_CLIENT_SENDFILE_CHUNK, data, len) != GERROR_NONE)
             {
-                std::cout << "[Client] Error sending chunk packet !" << std::endl;
+                cout << "[Client] Error sending chunk packet !" << endl;
 
                 is.close();
                 return GERROR_CANT_SEND_PACKET;
@@ -298,14 +298,14 @@ gerror_t client_send_file(client_t* client, const char* filename)
             server->bs_callback(sft.name, len, lenght);
 
 #ifdef GULTRA_DEBUG
-            std::cout << "[Client] Sending File termination packet." << std::endl;
+            cout << "[Client] Sending File termination packet." << endl;
 #endif // GULTRA_DEBUG
 
 /*
             // Et on termine
             if(server->client_send(client, PT_CLIENT_SENDFILE_TERMINATE, NULL, 0) != GERROR_NONE)
             {
-                std::cout << "[Client] Error sending terminate packet !" << std::endl;
+                cout << "[Client] Error sending terminate packet !" << endl;
 
                 is.close();
                 return GERROR_CANT_SEND_PACKET;
@@ -314,11 +314,11 @@ gerror_t client_send_file(client_t* client, const char* filename)
 
             is.close();
 
-            std::cout << "[Client] File '" << filename << "' correctly send to client '" << client->name << "'." << std::endl;
+            cout << "[Client] File '" << filename << "' correctly send to client '" << client->name << "'." << endl;
 
 #ifdef GULTRA_DEBUG
             long ten = timer_end(st);
-            std::cout << "[Client] Time elapsed (microseconds) = " << ten/1000 << "." << std::endl;
+            cout << "[Client] Time elapsed (microseconds) = " << ten/1000 << "." << endl;
 #endif // GULTRA_DEBUG
 
             return GERROR_NONE;
@@ -338,18 +338,18 @@ gerror_t client_send_file(client_t* client, const char* filename)
             sft.name[flenght]  = '\0';
 
 #ifdef GULTRA_DEBUG
-            std::cout << "[Client] Info : " << std::endl;
-            std::cout << "[Client] lenght          = " << lenght << "." << std::endl;
-            std::cout << "[Client] Chunk count     = " << sft.chunk_count.data << "." << std::endl;
-            std::cout << "[Client] Chunk lenght    = " << sft.chunk_lenght.data << "." << std::endl;
-            std::cout << "[Client] Chunk last size = " << sft.chunk_lastsize.data << "." << std::endl;
+            cout << "[Client] Info : " << endl;
+            cout << "[Client] lenght          = " << lenght << "." << endl;
+            cout << "[Client] Chunk count     = " << sft.chunk_count.data << "." << endl;
+            cout << "[Client] Chunk lenght    = " << sft.chunk_lenght.data << "." << endl;
+            cout << "[Client] Chunk last size = " << sft.chunk_lastsize.data << "." << endl;
 #endif // GULTRA_DEBUG
 
             sft = serialize<send_file_t>(sft);
             {
                 if(server->client_send(client, PT_CLIENT_SENDFILE_INFO, &sft, sizeof(sft)) != GERROR_NONE)
                 {
-                    std::cout << "[Client] Error sending info packet !" << std::endl;
+                    cout << "[Client] Error sending info packet !" << endl;
                     is.close();
                     return GERROR_CANT_SEND_PACKET;
                 }
@@ -369,24 +369,24 @@ gerror_t client_send_file(client_t* client, const char* filename)
                 is.read(buffer, sft.chunk_lenght.data);
                 if(!is)
                 {
-                    std::cout << "[Client] Error : Can't terminate file reading.";
+                    cout << "[Client] Error : Can't terminate file reading.";
                     is.close();
 
                     if(server->client_send(client, PT_CLIENT_SENDFILE_TERMINATE, NULL, 0) != GERROR_NONE)
                     {
-                        std::cout << "[Client] Error sending terminate packet !" << std::endl;
+                        cout << "[Client] Error sending terminate packet !" << endl;
                         return GERROR_CANT_SEND_PACKET;
                     }
                     return GERROR_IO_CANTREAD;
                 }
 
 #ifdef GULTRA_DEBUG
-                std::cout << "[Client] Sending chunk (size : " << sft.chunk_lenght.data << ", # = " << chunks << ")." << std::endl;
+                cout << "[Client] Sending chunk (size : " << sft.chunk_lenght.data << ", # = " << chunks << ")." << endl;
 #endif // GULTRA_DEBUG
 
                 if(server->client_send(client, PT_CLIENT_SENDFILE_CHUNK, buffer, sft.chunk_lenght.data) != GERROR_NONE)
                 {
-                    std::cout << "[Client] Error sending chunk packet !" << std::endl;
+                    cout << "[Client] Error sending chunk packet !" << endl;
                     is.close();
                     return GERROR_CANT_SEND_PACKET;
                 }
@@ -401,12 +401,12 @@ gerror_t client_send_file(client_t* client, const char* filename)
             is.read(buffer, sft.chunk_lastsize.data);
             if(!is)
             {
-                std::cout << "[Client] Error : Can't terminate file reading.";
+                cout << "[Client] Error : Can't terminate file reading.";
                 is.close();
 
                 if(server->client_send(client, PT_CLIENT_SENDFILE_TERMINATE, NULL, 0) != GERROR_NONE)
                 {
-                    std::cout << "[Client] Error sending terminate packet !" << std::endl;
+                    cout << "[Client] Error sending terminate packet !" << endl;
                     return GERROR_CANT_SEND_PACKET;
                 }
                 return GERROR_IO_CANTREAD;
@@ -415,12 +415,12 @@ gerror_t client_send_file(client_t* client, const char* filename)
             is.close();
 
 #ifdef GULTRA_DEBUG
-            std::cout << "[Client] Sending chunk (size : " << sft.chunk_lastsize.data << ", # = " << chunks << ")." << std::endl;
+            cout << "[Client] Sending chunk (size : " << sft.chunk_lastsize.data << ", # = " << chunks << ")." << endl;
 #endif // GULTRA_DEBUG
 
             if(server->client_send(client, PT_CLIENT_SENDFILE_CHUNK, buffer, sft.chunk_lenght.data) != GERROR_NONE)
             {
-                std::cout << "[Client] Error sending chunk packet !" << std::endl;
+                cout << "[Client] Error sending chunk packet !" << endl;
                 return GERROR_CANT_SEND_PACKET;
             }
 
@@ -432,16 +432,16 @@ gerror_t client_send_file(client_t* client, const char* filename)
 /*
             if(server->client_send(client, PT_CLIENT_SENDFILE_TERMINATE, NULL, 0) != GERROR_NONE)
             {
-                std::cout << "[Client] Error sending terminate packet !" << std::endl;
+                cout << "[Client] Error sending terminate packet !" << endl;
                 return GERROR_CANT_SEND_PACKET;
             }
 */
 
-            std::cout << "[Client] File '" << filename << "' correctly send to client '" << client->name << "'." << std::endl;
+            cout << "[Client] File '" << filename << "' correctly send to client '" << client->name << "'." << endl;
 
 #ifdef GULTRA_DEBUG
             long ten = timer_end(st);
-            std::cout << "[Client] Time elapsed (microseconds) = " << ten/1000 << "." << std::endl;
+            cout << "[Client] Time elapsed (microseconds) = " << ten/1000 << "." << endl;
 #endif // GULTRA_DEBUG
 
             return GERROR_NONE;
@@ -449,7 +449,7 @@ gerror_t client_send_file(client_t* client, const char* filename)
     }
     else
     {
-        std::cout << "[Client] Error : Can't open file '" << filename << "'.";
+        cout << "[Client] Error : Can't open file '" << filename << "'.";
         return GERROR_CANTOPENFILE;
     }
 }

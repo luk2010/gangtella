@@ -40,6 +40,13 @@ typedef enum {
     SP_CRYPTED = 2
 } SendPolicy;
 
+typedef struct {
+	std::string name; // User name
+	std::string key;  // User key
+	std::string iv;   // User iv
+	
+} user_t;
+
 typedef struct _server_ {
     SOCKET                sock;
 
@@ -58,8 +65,17 @@ typedef struct _server_ {
     client_send_t         client_send;  // Function to send packet. Can be crypted or not.
     bytesreceived_t       br_callback;  // Function called when bytes are received when transmitting a file.
     bytessend_t           bs_callback;  // Function called when bytes are send when transmitting a file.
+    
+    user_t				  logged_user;  // Current user logged in.
+    bool 				  logged;       // True if logged in.
 } server_t;
 
+gerror_t user_create(user_t& user, const std::string& uname, const std::string& upass);
+gerror_t user_destroy(user_t& user);
+gerror_t user_database_load(const std::string& dbname);
+gerror_t user_database_export(const std::string& dbname);
+gerror_t user_database_destroy();
+bool     user_database_isloaded();
 
 gerror_t server_create    (server_t* server, const std::string& disp_name);
 gerror_t server_initialize(server_t* server, size_t port, int maxclients);

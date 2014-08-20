@@ -25,6 +25,7 @@
 #define __CLIENT__H
 
 #include "prerequesites.h"
+#include "user.h"
 
 GBEGIN_DECL
 
@@ -47,6 +48,12 @@ typedef struct _client_ {
     _client_*   mirror;        // [server-side] Mirror client connection.
     void*       server;        // [Server-side] Server creating this client.
     buffer_t    pubkey;        // Public Key to decrypt data received.
+    bool        established;   // [Server-side] True if connection is established, false otherwise.
+    
+    user_t      logged_user;   // [Server-side] Stores the user wich the client is logged with.
+    bool        logged;        // [Server-side] True if client is logged with a user.
+    
+    bool        idling;        // [Server-side] True if the client thread loop is idling.
 
     _client_ () : sock(0) {}
 
@@ -61,52 +68,11 @@ typedef struct _client_ {
  *  @{
 **/
 
-/** @brief Create a Client from given information.
- *
- *  @param client : Pointer to a complete client structure. @note Only fields client_t::name
- *  and client_t::sock are required.
- *  @param adress : A usual IP or domain name to connect.
- *  @param port : The port to use for the connection (server-ide).
- *
- *  @return
- *  - GERROR_NONE on success.
- *  - GERROR_BADARGS if one of the given args is null.
- *  - GERROR_INVALID_SOCKET if socket is invalid or can't be created.
- *  - GERROR_INVALID_HOST if host is invalid.
- *  - GERROR_INVALID_CONNECT if can't connect to host.
- *  - An error depending on client_send_packet().
-**/
-gerror_t client_create(client_t* client, const char* adress, size_t port);
-
-/** @brief Send a packet to a given client.
- *  @see send_client_packet() for more details.
- *
- *  @param client : Pointer to the client structure.
- *  @param packet_type : Type of the packet to send.
- *  @param data : Raw data to send.
- *  @param sz : Size of the data to send.
- *
- *  @return
- *  The same as send_client_packet().
-**/
-gerror_t client_send_packet(client_t* client, uint8_t packet_type, const void* data, size_t sz);
-
-
-gerror_t client_send_cryptpacket(client_t* client, uint8_t packet_type, const void* data, size_t sz);
-gerror_t client_send_file(client_t* client, const char* filename);
-
-/** @brief Close a client connection.
- *  @param send_close_packet : If true, send a PT_CLIENT_CLOSING_CONNECTION packet to
- *  the corresponding socket. This option is used by the server to end mirror connections,
- *  so don't use it or use it at your own risk.
- *
- *  @return
- *  - GERROR_NONE on success
- *  - GERROR_BADARGS if one of the given args is null.
- *  - GERROR_CANT_CLOSE_SOCKET if socket could not be closed.
- *  - @see errors from client_send_packet().
-**/
-gerror_t client_close(client_t* client, bool send_close_packet = true);
+gerror_t client_create				(client_t* client, const char* adress, size_t port);
+gerror_t client_send_packet			(client_t* client, uint8_t packet_type, const void* data, size_t sz);
+gerror_t client_send_cryptpacket	(client_t* client, uint8_t packet_type, const void* data, size_t sz);
+gerror_t client_send_file			(client_t* client, const char* filename);
+gerror_t client_close				(client_t* client, bool send_close_packet = true);
 
 /**
  *  @}

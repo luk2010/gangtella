@@ -27,6 +27,7 @@
 #include "client.h"
 #include "encryption.h"
 #include "packet.h"
+#include "user.h"
 
 GBEGIN_DECL
 
@@ -39,13 +40,6 @@ typedef enum {
     SP_NORMAL  = 1,
     SP_CRYPTED = 2
 } SendPolicy;
-
-typedef struct {
-	std::string name; // User name
-	std::string key;  // User key
-	std::string iv;   // User iv
-	
-} user_t;
 
 typedef struct _server_ {
     SOCKET                sock;
@@ -70,29 +64,24 @@ typedef struct _server_ {
     bool 				  logged;       // True if logged in.
 } server_t;
 
-gerror_t user_create(user_t& user, const std::string& uname, const std::string& upass);
-gerror_t user_destroy(user_t& user);
-gerror_t user_database_load(const std::string& dbname);
-gerror_t user_database_export(const std::string& dbname);
-gerror_t user_database_destroy();
-bool     user_database_isloaded();
+gerror_t server_create    					(server_t* server, const std::string& disp_name);
+gerror_t server_initialize					(server_t* server, size_t port, int maxclients);
+gerror_t server_launch    					(server_t* server);
+gerror_t server_destroy   					(server_t* server);
 
-gerror_t server_create    (server_t* server, const std::string& disp_name);
-gerror_t server_initialize(server_t* server, size_t port, int maxclients);
-gerror_t server_launch    (server_t* server);
-gerror_t server_destroy   (server_t* server);
+gerror_t server_setsendpolicy				(server_t* server, int policy);
+gerror_t server_setbytesreceivedcallback	(server_t* server, bytesreceived_t callback);
+gerror_t server_setbytessendcallback		(server_t* server, bytessend_t callback);
+Packet* server_receive_packet				(server_t* server, client_t* client);
 
-gerror_t server_setsendpolicy(server_t* server, int policy);
-gerror_t server_setbytesreceivedcallback(server_t* server, bytesreceived_t callback);
-gerror_t server_setbytessendcallback(server_t* server, bytessend_t callback);
-Packet* server_receive_packet(server_t* server, client_t* client);
+client_t* server_find_client_by_name		(server_t* server, const std::string& name);
 
-client_t* server_find_client_by_name(server_t* server, const std::string& name);
+gerror_t server_abort_operation				(server_t* server, client_t* client);
 
-gerror_t server_abort_operation(server_t* server, client_t* client);
-
-gerror_t server_init_client_connection(server_t* server, client_t*& out, const char* adress, size_t port);
-void server_end_client(server_t* server, const std::string& client_name);
+gerror_t server_init_user_connection		(server_t* server, user_t& out, const char* adress, size_t port);
+gerror_t server_init_client_connection		(server_t* server, client_t*& out, const char* adress, size_t port);
+void server_wait_establisedclient			(client_t* client);
+void server_end_client						(server_t* server, const std::string& client_name);
 
 GEND_DECL
 

@@ -98,6 +98,8 @@
 		<Unit filename="serializer.h" />
 		<Unit filename="server.cpp" />
 		<Unit filename="server.h" />
+		<Unit filename="user.cpp" />
+		<Unit filename="user.h" />
 		<Extensions>
 			<code_completion />
 			<envvars />

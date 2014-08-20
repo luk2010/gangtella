@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1408368681 source:/home/luk2010/Projects/gangtella/main.cpp
+1408556024 source:/home/luk2010/Projects/gangtella/main.cpp
 	"prerequesites.h"
 	"commands.h"
 	"packet.h"
@@ -8,7 +8,7 @@
 
 1401869942 
 
-1408368619 /home/luk2010/Projects/gangtella/prerequesites.h
+1408553391 /home/luk2010/Projects/gangtella/prerequesites.h
 	<unistd.h>
 	<typeinfo>
 	<fstream>
@@ -25,6 +25,7 @@
 	<stdlib.h>
 	<map>
 	<sstream>
+	<limits>
 	<openssl/rsa.h>
 	<openssl/evp.h>
 	<windows.h>
@@ -38,29 +39,31 @@
 
 1401869463 r.h"
 
-1404928161 /home/luk2010/Projects/gangtella/packet.h
+1408551968 /home/luk2010/Projects/gangtella/packet.h
 	"prerequesites.h"
 
 1401869024 ites.h"
 
-1404489803 /home/luk2010/Projects/gangtella/client.h
+1408482320 /home/luk2010/Projects/gangtella/client.h
 	"prerequesites.h"
+	"user.h"
 
-1408369651 /home/luk2010/Projects/gangtella/server.h
+1408482530 /home/luk2010/Projects/gangtella/server.h
 	"prerequesites.h"
 	"client.h"
 	"encryption.h"
 	"packet.h"
+	"user.h"
 
-1407846499 source:/home/luk2010/Projects/gangtella/packet.cpp
+1408552018 source:/home/luk2010/Projects/gangtella/packet.cpp
 	"packet.h"
 
-1404919160 source:/home/luk2010/Projects/gangtella/client.cpp
+1408482298 source:/home/luk2010/Projects/gangtella/client.cpp
 	"packet.h"
 	"client.h"
 	"server.h"
 
-1408371481 source:/home/luk2010/Projects/gangtella/server.cpp
+1408549288 source:/home/luk2010/Projects/gangtella/server.cpp
 	"prerequesites.h"
 	"server.h"
 	"packet.h"
@@ -257,13 +260,13 @@
 	"server.h"
 	"packet.h"
 
-1404919248 source:/home/luk2010/Projects/gangtella/commands.cpp
+1408555979 source:/home/luk2010/Projects/gangtella/commands.cpp
 	"commands.h"
 
-1404918753 /home/luk2010/Projects/gangtella/commands.h
+1408555871 /home/luk2010/Projects/gangtella/commands.h
 	"prerequesites.h"
 
-1408371584 source:/home/luk2010/Projects/gangtella/encryption.cpp
+1408371711 source:/home/luk2010/Projects/gangtella/encryption.cpp
 	"encryption.h"
 	<openssl/pem.h>
 
@@ -349,4 +352,11 @@
 	"prerequesites.h"
 	"server.h"
 	"packet.h"
+
+1408548399 /home/luk2010/Projects/gangtella/user.h
+	"prerequesites.h"
+
+1408548380 source:/home/luk2010/Projects/gangtella/user.cpp
+	"user.h"
+	"encryption.h"
 

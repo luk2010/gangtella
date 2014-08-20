@@ -63,6 +63,10 @@ struct encrypted_info_t {
 template <> encrypted_info_t serialize(const encrypted_info_t&);
 template <> encrypted_info_t deserialize(const encrypted_info_t&);
 
+struct user_init_t {
+	char name[SERVER_MAXBUFSIZE];
+};
+
 /* ******************************************************************* */
 
 
@@ -79,7 +83,11 @@ typedef enum PacketType {
     PT_CLIENT_INFO               = 9,
     PT_ENCRYPTED_INFO            = 10,
     PT_ENCRYPTED_CHUNK           = 11,
-    PT_HTTP_REQUEST              = 12
+    PT_HTTP_REQUEST              = 12,
+    PT_USER_INIT                 = 13,
+    PT_USER_INIT_RESPONSE        = 14,
+    PT_USER_INIT_NOTACCEPTED     = 15,
+    PT_USER_INIT_NOTLOGGED       = 16
 } PacketType;
 
 /** @brief A generic class representing a Packet.
@@ -263,6 +271,33 @@ public:
     size_t getPacketSize() const { return SERVER_MAXBUFSIZE; }
 };
 typedef PacketPolicy<PT_HTTP_REQUEST> HttpRequestPacket;
+
+// ---------------------------------------
+
+template<>
+class PacketPolicy<PT_USER_INIT> : public Packet {
+public:
+    user_init_t data;
+
+    PacketPolicy() { m_type = PT_USER_INIT; }
+    ~PacketPolicy() {}
+
+    size_t getPacketSize() const { return sizeof(user_init_t); }
+};
+typedef PacketPolicy<PT_USER_INIT> UserInitPacket;
+
+template<>
+class PacketPolicy<PT_USER_INIT_RESPONSE> : public Packet {
+public:
+    user_init_t data;
+
+    PacketPolicy() { m_type = PT_USER_INIT_RESPONSE; }
+    ~PacketPolicy() {}
+
+    size_t getPacketSize() const { return sizeof(user_init_t); }
+};
+typedef PacketPolicy<PT_USER_INIT_RESPONSE> UserInitRPacket;
+
 
 
 Packet* packet_choose_policy(const int type);

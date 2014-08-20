@@ -30,9 +30,9 @@
 #define GVERSION_MIN   "1"
 
 #ifdef _DEBUG
-#define GVERSION_BUILD "2d"
+#define GVERSION_BUILD "6d"
 #else
-#define GVERSION_BUILD "2"
+#define GVERSION_BUILD "6"
 #endif // _DEBUG
 
 #define GANGTELLA_VERSION GVERSION_MAJ "." GVERSION_MIN "." GVERSION_BUILD
@@ -60,6 +60,7 @@
 #include <stdlib.h>
 #include <map>
 #include <sstream>
+#include <limits>
 
 // Comment tis line if you do not want the encryption module.
 // THIS IS VERY RECOMMENDED TO KEEP IT

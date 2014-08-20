@@ -128,6 +128,10 @@ Packet* packet_choose_policy(const int type)
         return new EncryptedChunkPacket();
     case PT_HTTP_REQUEST:
         return new HttpRequestPacket();
+	case PT_USER_INIT:
+		return new UserInitPacket();
+	case PT_USER_INIT_RESPONSE:
+		return new UserInitRPacket();
     default:
         return new Packet();
     }
@@ -311,6 +315,32 @@ gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size
         memcpy(&(ecp->chunk), data, len);
         return GERROR_NONE;
     }
+    
+    else if(type == PT_USER_INIT)
+	{
+		UserInitPacket* uip = reinterpret_cast<UserInitPacket*>(packet);
+		memcpy(&(uip->data), data, len);
+		return GERROR_NONE;
+	}
+	
+	else if(type == PT_USER_INIT_RESPONSE)
+	{
+		UserInitRPacket* uip = reinterpret_cast<UserInitRPacket*>(packet);
+		memcpy(&(uip->data), data, len);
+		return GERROR_NONE;
+	}
+	
+	else if(type == PT_USER_INIT_NOTACCEPTED)
+	{
+		packet->m_type = PT_USER_INIT_NOTACCEPTED;
+		return GERROR_NONE;
+	}
+	
+	else if(type == PT_USER_INIT_NOTLOGGED)
+	{
+		packet->m_type = PT_USER_INIT_NOTLOGGED;
+		return GERROR_NONE;
+	}
 
     cout << "[Packet] Unknown packet type received : '" << (uint32_t) type << "'." << endl;
     return GERROR_INVALID_PACKET;

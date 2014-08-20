@@ -201,7 +201,41 @@ void treat_command(const std::string& command)
 			server.logged = false;
 			cout << "[Command] Logged as 'null'." << endl;
 		}
+		
+		else if(args[0] == "userinit")
+		{
+			// userinit -- Open a connection with a client that should accept 
+			// or deny you. 
+			// If you are already accepted in his database, then you should be directly
+			// accepted. If you are new, it will send a request to the client to accept 
+			// you.
+			
+			if(!server.logged)
+			{
+				cout << "[Command] You must be logged in to init your user connection !" << endl;
+			}
+			
+			else
+			{
+				std::string ipclient   = args[1];
+				std::string portclient = args[2];
+				cout << "[Command] Initializing connection with identity '" << server.logged_user.name << "' to client '" << ipclient
+				     << ":" << portclient << "'." << endl;
+				
+				user_t clientuser;
+				if(server_init_user_connection(&server, clientuser, ipclient.c_str(), atoi(portclient.c_str())) == GERROR_NONE)
+				{
+					cout << "[Command] User connected to '" << clientuser.name << "'." << endl;
+				}
+				else
+				{
+					cout << "[Command] Something bad happened. See log for more details." << endl;
+				}
+			}
+		}
     }
+    
+    console_last_command = command;
 }
 
 void bytes_callback(const std::string& name, size_t current, size_t total)

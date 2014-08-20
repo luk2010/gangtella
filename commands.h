@@ -28,8 +28,14 @@
 
 GBEGIN_DECL
 
+extern std::string console_last_command;
+
 gerror_t console_set_output(std::ostream& os);
 gerror_t console_restore_output();
+
+void        console_reset_lastcommand();
+std::string console_get_lastcommand();
+void 		console_waitfor_command();
 
 GEND_DECL
 

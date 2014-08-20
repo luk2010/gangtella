@@ -26,6 +26,7 @@
 GBEGIN_DECL
 
 std::streambuf* coutbuf = nullptr;
+std::string console_last_command = "";
 
 #undef cout
 #undef endl
@@ -45,6 +46,22 @@ gerror_t console_restore_output()
 
     coutbuf = nullptr;
     return GERROR_NONE;
+}
+
+void console_reset_lastcommand()
+{
+	console_last_command.clear();
+}
+
+std::string console_get_lastcommand()
+{
+	return console_last_command;
+}
+
+void console_waitfor_command()
+{
+	std::string cpy = console_last_command;
+	while(console_last_command == cpy);
 }
 
 GEND_DECL

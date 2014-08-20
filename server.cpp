@@ -24,20 +24,11 @@
 #include "prerequesites.h"
 #include "server.h"
 #include "packet.h"
+#include "commands.h"
 
 GBEGIN_DECL
 
 #define ID_CLIENT_INVALID 0
-
-typedef struct {
-	std::string                   dbname;   // Database name.
-	std::string                   dbfile;   // Database file.
-	bool                          autosave; // True if database is saved when destroyed or reloaded.
-	std::map<std::string, user_t> users;    // Users in the database, with their user_t struct.
-	
-} user_db_t;
-
-user_db_t* udatabase = nullptr;
 
 void* server_thread_loop (void*);
 
@@ -94,8 +85,10 @@ std::string server_http_compute_home(server_t* server)
        << "    <title>Server " << server->name << " Home</title>"
        << "  </head>"
        << "  <body>"
-       << "    <h1>" << server->name << " Home</h1>"
-       << "  </body>"
+       << "    <h1>" << server->name << " Home</h1>";
+       if(server->logged)
+	hp << "    <p>Current user logged : " << server->logged_user.name << ".</p>";
+	hp << "  </body>"
        << "</html>";
     return hp.str();
 }
@@ -630,7 +623,9 @@ void* server_client_thread_loop(void* data)
 
     while(1)
     {
+    	client->idling  = true;
         Packet* pclient = server_receive_packet(org, client);
+        client->idling  = false;
 
         if(!pclient || pclient->m_type == PT_CLIENT_CLOSING_CONNECTION)
         {
@@ -676,9 +671,116 @@ void* server_client_thread_loop(void* data)
         else if(pclient->m_type == PT_CLIENT_ESTABLISHED)
         {
             cout << "[Server]{" << client->name << "} Established connection." << endl;
+            client->established = true;
             delete pclient;
+            
+            // As client is valid, we can save it to the database.
+			if(user_database_isloaded())
+			{
+				dbclient_t dbc;
+				dbc.ip   = std::string(inet_ntoa(client->address.sin_addr));
+				dbc.port = std::to_string(ntohs(client->mirror->address.sin_port));
+				udatabase->clients.push_back(dbc);
+			}
         }
 
+		else if(pclient->m_type == PT_USER_INIT)
+		{
+			cout << "[Server]{" << client->name << "} Initializing user." << endl;
+			UserInitPacket* uip = reinterpret_cast<UserInitPacket*>(pclient);
+			cout << "[Server]{" << client->name << "} Connected user '" << uip->data.name << "'." << endl;
+			
+			if(org->logged)
+			{
+				// Verify that user isn't already accepted.
+				if(udatabase->users.find(uip->data.name) != udatabase->users.end())
+				{
+#ifndef GULTRA_DEBUG
+					cout << "[Server]{" << client->name << "} Sending user info." << endl;
+#endif // GULTRA_DEBUG
+					
+					// User is already accepted, so register it normally.
+					user_init_t uinit;
+					strcpy(uinit.name, org->logged_user.name.c_str());
+					org->client_send(client->mirror, PT_USER_INIT_RESPONSE, &uinit, sizeof(uinit));
+			
+					client->logged_user.name = std::string(uip->data.name);
+					client->logged           = true;
+					
+					cout << "[Server]{" << client->name << "} User '" << uip->data.name << "' accepted." << endl;
+				}
+				
+				else 
+				{
+					cout << "[Server]{" << client->name << "} Do you accept user '" << uip->data.name << "' ? (Y/N)" << endl;
+				
+					// If this server is logged in, we will ask for the user if we should accept this userinit command.
+					std::string lastcmd;
+					console_reset_lastcommand();
+					console_waitfor_command();
+					lastcmd = console_get_lastcommand();
+				
+					if(lastcmd == "Y")
+					{
+						// If we accept the user, we save it to database.
+#ifndef GULTRA_DEBUG
+						cout << "[Server]{" << client->name << "} Sending user info." << endl;
+#endif // GULTRA_DEBUG
+
+						user_init_t uinit;
+						strcpy(uinit.name, org->logged_user.name.c_str());
+						org->client_send(client->mirror, PT_USER_INIT_RESPONSE, &uinit, sizeof(uinit));
+			
+						client->logged_user.name = std::string(uip->data.name);
+						client->logged           = true;
+					
+						cout << "[Server]{" << client->name << "} User '" << uip->data.name << "' accepted." << endl;
+					}
+					else
+					{
+						// User didn't accept the connection, just discard it.
+						org->client_send(client->mirror, PT_USER_INIT_NOTACCEPTED, nullptr, 0);
+						cout << "[Server]{" << client->name << "} User '" << uip->data.name << "' not accepted." << endl;
+					}
+				}
+			}
+			
+			else
+			{
+				// If this server is not logged in, we should send the client a packet to 
+				// end the user initialization.
+				org->client_send(client->mirror, PT_USER_INIT_NOTLOGGED, nullptr, 0);
+				
+				cout << "[Server]{" << client->name << "} User '" << uip->data.name << "' tried to logged in to you but"
+				     << " you are not logged in. Please log in." << endl;
+			}
+			
+			delete pclient;
+	    }
+	    
+	    else if(pclient->m_type == PT_USER_INIT_RESPONSE)
+		{
+			cout << "[Server]{" << client->name << "} Initializing user." << endl;
+			UserInitPacket* uip = reinterpret_cast<UserInitPacket*>(pclient);
+			cout << "[Server]{" << client->name << "} Connected user '" << uip->data.name << "'." << endl;
+			
+			client->logged_user.name = std::string(uip->data.name);
+			client->logged           = true;
+			delete pclient;
+		}
+		
+		else if(pclient->m_type == PT_USER_INIT_NOTLOGGED)
+		{
+			cout << "[Server]{" << client->name << "} Can't initialize to server : It is not logged "
+			     << "in." << endl;
+			delete pclient;
+		}
+		
+		else if(pclient->m_type == PT_USER_INIT_NOTACCEPTED)
+		{
+			cout << "[Server]{" << client->name << "} Client didn't accept you ! I can't do anythig for you..." << endl;
+			delete pclient;
+		}
 
         else if(pclient->m_type == PT_CLIENT_SENDFILE_INFO)
         {
@@ -989,6 +1091,7 @@ void* server_thread_loop(void* __serv)
                     gthread_mutex_unlock(&server->mutex);
 
                     client_t* cclient = server->client_by_id[new_client.mirror->id.data];
+                    cclient->established = true;
 
                     // We now send the PT_CONNECTION_ESTABLISHED packet and create the client thread.
                     server_create_client_thread_loop(server, cclient);
@@ -996,6 +1099,15 @@ void* server_thread_loop(void* __serv)
 
                     // If everything is alright, we can tell user
                     cout << "[Server] New Client connected (name = '" << cclient->name << "', id = '" << cclient->mirror->id.data << "')." << endl;
+                    
+                    // As client is valid, we can save it to the database.
+                    if(user_database_isloaded())
+					{
+						dbclient_t dbc;
+						dbc.ip   = std::string(inet_ntoa(csin.sin_addr));
+						dbc.port = std::to_string(cip->info.s_port.data);
+						udatabase->clients.push_back(dbc);
+					}
                 }
 
                 else
@@ -1124,10 +1236,12 @@ gerror_t server_init_client_connection(server_t* server, client_t*& out, const c
 
     // Once the mirror is created, we create the original client
     client_t new_client;
-    new_client.id.data = 0;
-    new_client.mirror  = mirror;
-    new_client.server  = server;
-    new_client.sock    = SOCKET_ERROR;
+    new_client.id.data     = 0;
+    new_client.mirror      = mirror;
+    new_client.server      = server;
+    new_client.sock        = SOCKET_ERROR;
+    new_client.established = false;
+    new_client.logged      = false;
 
 #ifdef GULTRA_DEBUG
     cout << "[Server] Registering org client." << endl;
@@ -1202,265 +1316,53 @@ void server_end_client(server_t* server, const std::string& client_name)
     }
 }
 
-/** @brief Create a user using password and name.
- * 
- *  If the current directory contains users.gtl file, it will read the user data from this 
- *  file and verify that the password is correct.
- *  If users.gtl does not exist, a new user is created using given pass and initializing with
- *  a new initialization vector.
+/** @brief Initialize a new connection with a logged in server.
  *
- *  @note
- *  You can also load a different database using user_database_load().
- *  
- *  @param user  : A reference to an allocated user structure.
- *  @param uname : Name of the user to read into database. If no user is found, it creates a new
- *  entry in the database.
- *  @param upass : Password of the user to read into the database.
+ *  @param server : The server object to use.
+ *  @param out    : The connected user informations.
+ *  @param adress : The adress of the client to connect.
+ *  @param port   : The port of the client.
  *
- *  @return 
- *  - GERROR_NONE        : No errors occured.
- *  - GERROR_BADARGS     : uname or upass are empty.
- *  - GERROR_USR_NODB    : No database loaded.
- *  - GERROR_USR_NOKEY   : Can't create keypass.
- *  - GERROR_USR_BADPSWD : Incorrect password.
-**/
-gerror_t user_create(user_t& user, const std::string& uname, const std::string& upass)
-{
-	if(uname.empty() || upass.empty())
-		return GERROR_BADARGS;
-	
-	if(!user_database_isloaded())
-		return GERROR_USR_NODB;
-		
-	if(udatabase->users.find(uname) == udatabase->users.end())
-	{
-		// Create new user in database
-		user.name = uname;
-		if(Encryption::user_create_keypass(user.key, user.iv, upass.c_str(), upass.size()) != GERROR_NONE)
-		{
-			// Can't create keypass, abort.
-			return GERROR_USR_NOKEY;
-		}
-		
-		// Everything turned right, new user is on !
-#ifdef GULTRA_DEBUG
-		cout << "[User] Correctly created user '" << uname << "'." << endl;
-#endif // GULTRA_DEBUG
-		
-		return GERROR_NONE;
-	}
-	
-	// We found user in database, so check password.
-		
-	if(Encryption::user_check_password(udatabase->users[uname].key, udatabase->users[uname].iv, upass.c_str(), upass.size()))
-	{
-		// Load user from database
-		user.name = uname;
-		user.key  = udatabase->users[uname].key;
-		user.iv   = udatabase->users[uname].iv;
-
-#ifdef GULTRA_DEBUG
-		cout << "[User] Correctly loaded user '" << uname << "'." << endl;
-#endif // GULTRA_DEBUG
-
-		return GERROR_NONE;
-	}
-	
-	// Password wrong, return.
-	return GERROR_USR_BADPSWD;
-}
-
-/** @brief Destroy a given user, and saves its data into the database.
- *  
- *  @param user : User to destroy. If an entry corresponding to this user
- *  is already used, the fields name and signed_pass can't be changed (this
- *  is for security purpose). If the entry doesn't exist, the user is saved directly
- *  in the database.
- *
- *  @note
- *  The user structure is invalid after this function. Every members is set to 0.
- *
- *  @return 
- *  - GERROR_NONE    : No errors occured.
- *  - GERROR_BADARGS : User is invalid.
-**/
-gerror_t user_destroy(user_t& user)
-{
-	if(user.name.empty() || user.key.empty())
-		return GERROR_BADARGS;
-	
-	// Find the user in the database
-	if(udatabase->users.find(user.name) == udatabase->users.end())
-	{
-		// We did not find the user : save it.
-		udatabase->users[user.name].name = user.name;
-		udatabase->users[user.name].key  = user.key;
-		udatabase->users[user.name].iv   = user.iv;
-	}
-	
-	user.name.clear();
-	user.key.clear();
-	user.iv.clear();
-	
-	// Everything went okay
-	return GERROR_NONE;
-}
-
-/** @brief Load a database with given name.
- *  
- *  The database must follow an exact pattern. You can export your database
- *  using user_database_export(), and so import another database using this
- *  function.
- *
- *  @note
- *  Only one database can be used by server, and at server creation, database 
- *  "users.gtl" is loaded by default.
- *
- *  @param dbname : Path to the database to load. It can be an absolute path or
- *  a relative from the executable.
- *
- *  @return 
- *  - GERROR_NONE         : No errors occured.
- *  - GERROR_BADARGS      : Path is invalid.
- *  - GERROR_CANTOPENFILE : Stream can't be opened.
- *  - GERROR_IO_CANTREAD  : Stream can't read database data.
-**/
-gerror_t user_database_load(const std::string& dbname)
-{
-	if(dbname.empty())
-		return GERROR_BADARGS;
-		
-	if(udatabase)
-		user_database_destroy();
-	
-	std::ifstream indb(dbname.c_str());
-	if(!indb)
-		return GERROR_CANTOPENFILE;
-		
-	udatabase = new user_db_t;
-	std::string curr_word;
-
-	cout << "[User] Processing database '" << dbname << "'." << endl;
-	udatabase->dbfile = dbname;
-	while(indb >> curr_word)
-	{
-		if(curr_word == "[dbname]")
-		{
-			// Database name processing
-			indb >> udatabase->dbname;
-#ifdef GULTRA_DEBUG
-			cout << "[User] Name = '" << udatabase->dbname << "'." << endl;
-#endif // GULTRA_DEBUG
-		}
-		else if(curr_word == "[autosave]")
-		{
-			std::string boolean; indb >> boolean;
-			if(boolean == "true")
-				udatabase->autosave = true;
-			else
-				udatabase->autosave = false;
-#ifdef GULTRA_DEBUG
-			cout << "[User] Autosave = '" << boolean << "'." << endl;
-#endif // GULTRA_DEBUG
-		}
-		else if(curr_word == "[user]")
-		{
-			std::string uname, ukey, uiv;
-			indb >> uname >> ukey >> uiv;
-#ifdef GULTRA_DEBUG
-			cout << "[User] New user processed ('" << uname << "')." << endl;
-#endif // GULTRA_DEBUG
-
-			udatabase->users[uname].name = uname;
-			udatabase->users[uname].key  = ukey;
-			udatabase->users[uname].iv   = uiv;
-		}
-		else
-		{
-			cout << "[User] Bad keyword given in database '" << dbname << "' (" << curr_word << ")." << endl;
-		}
-	}
-
-	cout << "[User] Database '" << dbname << "' loaded." << endl;
-	return GERROR_NONE;
-}
-
-/** @brief Export a database to given filename.
- *
- *  Use this function to export your database giving you the
- *  possibility to load it from any GangTella application.
- *
- *  @param dbname : File to save the database.
- *
- *  @return 
- *  - GERROR_NONE         : No errors occured.
- *  - GERROR_BADARGS      : Path is invalid or no database is
- *  loaded.
- *  - GERROR_CANTOPENFILE : File given can't be opened.
-**/
-gerror_t user_database_export(const std::string& dbname)
-{
-	if(dbname.empty() || !user_database_isloaded())
-		return GERROR_BADARGS;
-	
-	std::ofstream os(dbname.c_str());
-	if(!os)
-	{
-#ifdef GULTRA_DEBUG
-		cout << "[User] Can't open file '" << dbname << "' to export database !" << endl;
-#endif // GULTRA_DEBUG
-
-		return GERROR_CANTOPENFILE;
-	}
-	
-	// File is opened and database is ready to be exported. 
-#ifdef GULTRA_DEBUG
-	cout << "[User] Exporting database '" << udatabase->dbname << "' to file '" << dbname << "'." << endl;
-#endif // GULTRA_DEBUG
-
-	// Name
-	os << "[dbname] " << udatabase->dbname << "\n";
-	
-	// Autosave option
-	if(udatabase->autosave)
-		os << "[autosave] true\n";
-	else
-		os << "[autosave] false\n";
-	
-	// Users
-	std::map<std::string, user_t>::const_iterator e  = udatabase->users.end();
-	std::map<std::string, user_t>::iterator       it = udatabase->users.begin();
-	
-	for(; it != e; ++it)
-		os << "[user] " << it->first << " " << it->second.key << " " << it->second.iv << "\n";
-	
-	return GERROR_NONE;
-}
-
-/** @brief Returns true if database is loaded.
-**/
-bool user_database_isloaded()
-{
-	return !(udatabase == nullptr);
-}
-
-/** @brief Destroy the currently loaded database.
- *  @note Database with 'autosave' option set to true will 
- *  be re-exported to their appropriate file.
+ *  This function consist on several requests from this server to another
+ *  one, aquiring some informations like currently logged user, server info, 
+ *  and some more.
+ *  When you use thhis function, it assumes that you automaticly trust
+ *  the client to be a good client. It has to be the client wich should accept
+ *  or deny you the first time you connect to him. 
  *
  *  @return
- *  - GERROR_NONE : No errors occured.
+ *  - GERROR_NONE            : All is okay.
+ *  - GERROR_BADARGS         : Bad args given.
+ *  - GERROR_INVALID_CONNECT : Can't connect to server.
 **/
-gerror_t user_database_destroy()
+gerror_t server_init_user_connection(server_t* server, user_t& out, const char* adress, size_t port)
 {
-	if(!user_database_isloaded())
-		return GERROR_NONE;
+	if(!server || !adress || port == 0)
+		return GERROR_BADARGS;
+		
+	client_t* new_client = nullptr;
+	server_init_client_connection(server, new_client, adress, port);
+	if(!new_client)
+		return GERROR_INVALID_CONNECT;
+		
+	server_wait_establisedclient(new_client);
 	
-	if(udatabase->autosave)
-		user_database_export(udatabase->dbfile);
+	// Now client connection is established, we send a packet to init user connection
+	user_init_t uinit;
+	strcpy(uinit.name, server->logged_user.name.c_str());
 	
-	delete udatabase;
+	server->client_send(new_client->mirror, PT_USER_INIT, &uinit, sizeof(uinit));
+	
+	// Wait for the client to be logged in
+	while(new_client->logged == false);
+	
+	out.name = new_client->logged_user.name;
 	return GERROR_NONE;
+}
+
+void server_wait_establisedclient(client_t* client)
+{
+	while(client->established == false);
 }
 
 GEND_DECL

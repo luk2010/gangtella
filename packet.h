@@ -65,6 +65,8 @@ template <> encrypted_info_t deserialize(const encrypted_info_t&);
 
 struct user_init_t {
 	char name[SERVER_MAXBUFSIZE];
+	char key [SERVER_MAXBUFSIZE];
+	char iv  [SERVER_MAXBUFSIZE];
 };
 
 /* ******************************************************************* */

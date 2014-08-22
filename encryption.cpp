@@ -270,7 +270,11 @@ namespace Encryption
 		}
 		
 		unsigned char ukey[EVP_MAX_KEY_LENGTH];
+		memset(ukey, 0, EVP_MAX_KEY_LENGTH);
+		
 		unsigned char uiv[EVP_MAX_IV_LENGTH];
+		memset(uiv, 0, EVP_MAX_IV_LENGTH);
+		
 		int err = EVP_BytesToKey(cipher, dgst, NULL, (unsigned char*) passwd, passwdsz, 4, ukey, uiv);
 		
 		if(!err)
@@ -282,8 +286,8 @@ namespace Encryption
 			return GERROR_EVPBTKFAILURE;
 		}
 		
-		size_t ukeyl = strlen((char*) ukey);
-		size_t uivl  = strlen((char*) uiv);
+		size_t ukeyl = EVP_MAX_KEY_LENGTH;
+		size_t uivl  = EVP_MAX_IV_LENGTH;
 		
 		std::stringstream outkeystream;
 		for(size_t i = 0; i < ukeyl; ++i)

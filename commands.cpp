@@ -64,4 +64,57 @@ void console_waitfor_command()
 	while(console_last_command == cpy);
 }
 
+typedef struct 
+{
+	command_func_t           cmd;
+	std::vector<std::string> args;
+	server_t*                server;
+} async_cmd_private_t;
+
+void* async_cmd_thread_loop (void* d)
+{
+	async_cmd_private_t* data = (async_cmd_private_t*) d;
+	
+	if(data)
+		data->cmd(data->args, data->server);
+	
+	return NULL;
+}
+
+/** @brief Launch a thread to process given command.
+ *
+ *  @param cmd_type : The command to execute.
+ *  @param args     : A vector containing every args in the command line. @note args[0] is the
+ *  command name.
+ *  @param server   : A pointer to the current server.
+ *
+**/
+void async_command_launch(int cmd_type, const std::vector<std::string>& args, server_t* server)
+{
+	if(cmd_type < CMD_MAX && cmd_type > CMD_UNKNOWN)
+	{
+		command_func_t cmd = async_commands[cmd_type].callback;
+		
+		async_cmd_private_t* cmd_private = new async_cmd_private_t;
+		cmd_private->cmd    = cmd;
+		cmd_private->args   = args;
+		cmd_private->server = server;
+		
+		pthread_t _thread;
+		pthread_create(&_thread, 0, async_cmd_thread_loop, cmd_private);
+	}
+}
+
+async_cmd_t async_commands [CMD_MAX] = 
+{
+	{ CMD_UNKNOWN,     async_cmd_unknown     },
+	{ CMD_USERLOGIN,   async_cmd_userlogin   },
+	{ CMD_USERUNLOG,   async_cmd_userunlog   },
+	{ CMD_USERINIT,    async_cmd_userinit    },
+	{ CMD_INFO,        async_cmd_info        },
+	{ CMD_OPENCLIENT,  async_cmd_openclient  },
+	{ CMD_CLOSECLIENT, async_cmd_closeclient },
+	{ CMD_SENDFILE,    async_cmd_sendfile    }
+};
+
 GEND_DECL

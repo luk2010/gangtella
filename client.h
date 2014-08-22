@@ -53,7 +53,7 @@ typedef struct _client_ {
     user_t      logged_user;   // [Server-side] Stores the user wich the client is logged with.
     bool        logged;        // [Server-side] True if client is logged with a user.
     
-    bool        idling;        // [Server-side] True if the client thread loop is idling.
+    bool        idling;        // [Server-side] True if the client thread loop is idling (waiting for a packet).
 
     _client_ () : sock(0) {}
 

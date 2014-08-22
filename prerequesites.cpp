@@ -182,7 +182,8 @@ static const char* __errors [GERROR_MAX] = {
     "Can't create user keypass.",
     "Incorrect password given.",
     "Cipher requested not found.",
-    "(OpenSSL) EVP_BytesToKey failed."
+    "(OpenSSL) EVP_BytesToKey failed.",
+    "Time out has expired."
 };
 
 const char* gerror_to_string(gerror_t& err)

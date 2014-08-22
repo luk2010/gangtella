@@ -60,6 +60,7 @@ gerror_t user_database_load		(const std::string& dbname);
 gerror_t user_database_export	(const std::string& dbname);
 gerror_t user_database_destroy	();
 bool     user_database_isloaded	();
+bool     user_is_loaded         (const std::string& name);
 
 GEND_DECL
 

@@ -80,7 +80,7 @@ gerror_t server_abort_operation				(server_t* server, client_t* client);
 
 gerror_t server_init_user_connection		(server_t* server, user_t& out, const char* adress, size_t port);
 gerror_t server_init_client_connection		(server_t* server, client_t*& out, const char* adress, size_t port);
-void server_wait_establisedclient			(client_t* client);
+gerror_t server_wait_establisedclient	    (client_t* client, uint32_t timeout = 0);
 void server_end_client						(server_t* server, const std::string& client_name);
 
 GEND_DECL

@@ -304,4 +304,11 @@ gerror_t user_database_destroy()
 	return GERROR_NONE;
 }
 
+/** @brief Returns true if user is loaded.
+**/
+bool user_is_loaded(const std::string& name)
+{
+	return udatabase ? udatabase->users.find(name) != udatabase->users.end() : false;
+}
+
 GEND_DECL

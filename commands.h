@@ -25,6 +25,7 @@
 #define __COMMANDS_H__
 
 #include "prerequesites.h"
+#include "server.h"
 
 GBEGIN_DECL
 
@@ -36,6 +37,40 @@ gerror_t console_restore_output();
 void        console_reset_lastcommand();
 std::string console_get_lastcommand();
 void 		console_waitfor_command();
+
+typedef gerror_t (*command_func_t) (std::vector<std::string> args, server_t* server);
+typedef enum {
+	CMD_UNKNOWN     = 0,
+	CMD_USERLOGIN   = 1,
+	CMD_USERUNLOG   = 2,
+	CMD_USERINIT    = 3,
+	CMD_INFO        = 4,
+	CMD_OPENCLIENT  = 5,
+	CMD_CLOSECLIENT = 6,
+	CMD_SENDFILE    = 7,
+	
+	CMD_MAX         = 8
+} Commands;
+
+typedef struct async_cmd_
+{
+	int            cmd_id;   // This corresponds to the id of Commands enum.
+	command_func_t callback; // This corresponds to the function callback used for this command.
+} async_cmd_t;
+
+void async_command_launch(int cmd_type, const std::vector<std::string>& args, server_t* server);
+
+gerror_t async_cmd_unknown     (std::vector<std::string> args, server_t* server);
+gerror_t async_cmd_userlogin   (std::vector<std::string> args, server_t* server);
+gerror_t async_cmd_userunlog   (std::vector<std::string> args, server_t* server);
+gerror_t async_cmd_userinit    (std::vector<std::string> args, server_t* server);
+gerror_t async_cmd_info        (std::vector<std::string> args, server_t* server);
+gerror_t async_cmd_openclient  (std::vector<std::string> args, server_t* server);
+gerror_t async_cmd_closeclient (std::vector<std::string> args, server_t* server);
+gerror_t async_cmd_sendfile    (std::vector<std::string> args, server_t* server);
+
+// This array makes us call any commands where we want.
+extern async_cmd_t async_commands[CMD_MAX];
 
 GEND_DECL
 

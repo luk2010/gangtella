@@ -30,9 +30,9 @@
 #define GVERSION_MIN   "1"
 
 #ifdef _DEBUG
-#define GVERSION_BUILD "6d"
+#define GVERSION_BUILD "7d"
 #else
-#define GVERSION_BUILD "6"
+#define GVERSION_BUILD "7"
 #endif // _DEBUG
 
 #define GANGTELLA_VERSION GVERSION_MAJ "." GVERSION_MIN "." GVERSION_BUILD
@@ -194,8 +194,9 @@ typedef enum GError
     GERROR_USR_BADPSWD       = 24,
     GERROR_BADCIPHER         = 25,
     GERROR_EVPBTKFAILURE     = 26,
+    GERROR_TIMEDOUT          = 27,
 
-    GERROR_MAX               = 27  // Number of errors
+    GERROR_MAX               = 28  // Number of errors
 } GError;
 typedef int gerror_t;
 

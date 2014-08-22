@@ -83,6 +83,7 @@
 		<Linker>
 			<Add option="-lpthread" />
 		</Linker>
+		<Unit filename="async_cmd.cpp" />
 		<Unit filename="client.cpp" />
 		<Unit filename="client.h" />
 		<Unit filename="commands.cpp" />

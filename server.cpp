@@ -392,6 +392,17 @@ gerror_t server_destroy(server_t* server)
 
             closesocket(server->clients[i].sock);
         }
+        
+        if(server->clients[i].logged)
+		{
+			// We try to save the user if it has not already been saved.
+			if(!user_is_loaded(server->clients[i].logged_user.name))
+			{
+				udatabase->users[server->clients[i].logged_user.name].name = server->clients[i].logged_user.name;
+				udatabase->users[server->clients[i].logged_user.name].key  = server->clients[i].logged_user.key;
+				udatabase->users[server->clients[i].logged_user.name].iv   = server->clients[i].logged_user.iv;
+			}
+		}
     }
 
     closesocket(server->sock);
@@ -644,6 +655,17 @@ void* server_client_thread_loop(void* data)
 
             closesocket(client->sock);
             client->sock = 0;
+            
+            if(client->logged)
+			{
+				// We try to save the user if it has not already been saved.
+				if(!user_is_loaded(client->logged_user.name))
+				{
+					udatabase->users[client->logged_user.name].name = client->logged_user.name;
+					udatabase->users[client->logged_user.name].key  = client->logged_user.key;
+					udatabase->users[client->logged_user.name].iv   = client->logged_user.iv;
+				}
+			}
 
             cout << "[Server]{" << client->name << "} Closed client." << endl;
 
@@ -702,9 +724,13 @@ void* server_client_thread_loop(void* data)
 					// User is already accepted, so register it normally.
 					user_init_t uinit;
 					strcpy(uinit.name, org->logged_user.name.c_str());
+					strcpy(uinit.key,  org->logged_user.key.c_str());
+					strcpy(uinit.iv,   org->logged_user.iv.c_str());
 					org->client_send(client->mirror, PT_USER_INIT_RESPONSE, &uinit, sizeof(uinit));
 			
 					client->logged_user.name = std::string(uip->data.name);
+					client->logged_user.key  = std::string(uip->data.key);
+					client->logged_user.iv   = std::string(uip->data.iv);
 					client->logged           = true;
 					
 					cout << "[Server]{" << client->name << "} User '" << uip->data.name << "' accepted." << endl;
@@ -729,9 +755,13 @@ void* server_client_thread_loop(void* data)
 
 						user_init_t uinit;
 						strcpy(uinit.name, org->logged_user.name.c_str());
+						strcpy(uinit.key,  org->logged_user.key.c_str());
+						strcpy(uinit.iv,   org->logged_user.iv.c_str());
 						org->client_send(client->mirror, PT_USER_INIT_RESPONSE, &uinit, sizeof(uinit));
 			
 						client->logged_user.name = std::string(uip->data.name);
+						client->logged_user.key  = std::string(uip->data.key);
+						client->logged_user.iv   = std::string(uip->data.iv);
 						client->logged           = true;
 					
 						cout << "[Server]{" << client->name << "} User '" << uip->data.name << "' accepted." << endl;
@@ -1308,6 +1338,17 @@ void server_end_client(server_t* server, const std::string& client_name)
 
                 closesocket(client->sock);
             }
+            
+            if(client->logged)
+			{
+				// We try to save the user if it has not already been saved.
+				if(!user_is_loaded(client->logged_user.name))
+				{
+					udatabase->users[client->logged_user.name].name = client->logged_user.name;
+					udatabase->users[client->logged_user.name].key  = client->logged_user.key;
+					udatabase->users[client->logged_user.name].iv   = client->logged_user.iv;
+				}
+			}
 
             server->clients.erase(server->clients.begin() + server_find_client_index_private_(server, client_name));
             server->client_by_id[id] = nullptr;
@@ -1344,12 +1385,18 @@ gerror_t server_init_user_connection(server_t* server, user_t& out, const char* 
 	server_init_client_connection(server, new_client, adress, port);
 	if(!new_client)
 		return GERROR_INVALID_CONNECT;
-		
-	server_wait_establisedclient(new_client);
+
+	if(server_wait_establisedclient(new_client, 4) != GERROR_NONE)
+	{
+		cout << "[Server] Can't establish client '" << adress << ":" << port << "'. (Timed out)" << endl;
+		return GERROR_INVALID_CONNECT;
+	}
 	
 	// Now client connection is established, we send a packet to init user connection
 	user_init_t uinit;
 	strcpy(uinit.name, server->logged_user.name.c_str());
+	strcpy(uinit.key,  server->logged_user.key.c_str());
+	strcpy(uinit.iv,   server->logged_user.iv.c_str());
 	
 	server->client_send(new_client->mirror, PT_USER_INIT, &uinit, sizeof(uinit));
 	
@@ -1360,9 +1407,41 @@ gerror_t server_init_user_connection(server_t* server, user_t& out, const char* 
 	return GERROR_NONE;
 }
 
-void server_wait_establisedclient(client_t* client)
+/** @brief Wait for given client to be established.
+ *  
+ *  Use this function to wait for a client between the 'Connecting' state
+ *  and the 'Connected' state.
+ *
+ *  @note You should always use a timeout because this is a blocking
+ *  function and you may get stuck.
+ *
+ *  @param client  : Pointer to the client to wait for.
+ *  @param timeout : Maximum time to wait for the client, in seconds.
+ *
+ *  @return
+ *  - GERROR_NONE     : All is okay.
+ *  - GERROR_TIMEDOUT : Time out has expired.
+**/
+gerror_t server_wait_establisedclient(client_t* client, uint32_t timeout)
 {
-	while(client->established == false);
+	if(timeout > 0)
+	{
+		uint32_t startTime = time(NULL);
+		uint32_t elapsedTime;
+		while(client->established == false)
+		{
+			elapsedTime = difftime(time(NULL), startTime);
+			if(elapsedTime > timeout)
+				return GERROR_TIMEDOUT;
+		}
+		
+		return GERROR_NONE;
+	}
+	else
+	{
+		while(client->established == false);
+		return GERROR_NONE;
+	}
 }
 
 GEND_DECL

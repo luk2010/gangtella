@@ -54,13 +54,14 @@ typedef struct {
 
 extern user_db_t* udatabase;
 
-gerror_t user_create			(user_t& user, const std::string& uname, const std::string& upass);
-gerror_t user_destroy			(user_t& user);
-gerror_t user_database_load		(const std::string& dbname);
-gerror_t user_database_export	(const std::string& dbname);
-gerror_t user_database_destroy	();
-bool     user_database_isloaded	();
-bool     user_is_loaded         (const std::string& name);
+gerror_t user_create				 (user_t& user, const std::string& uname, const std::string& upass);
+gerror_t user_destroy				 (user_t& user);
+gerror_t user_database_load			 (const std::string& dbname);
+gerror_t user_database_export	 	 (const std::string& dbname);
+gerror_t user_database_destroy		 ();
+bool     user_database_isloaded		 ();
+bool     user_is_loaded         	 (const std::string& name);
+bool     user_database_clientisloaded(const dbclient_t& client);
 
 GEND_DECL
 

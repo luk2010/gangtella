@@ -132,6 +132,11 @@ void treat_command(const std::string& command)
 			// This is a beta test
 			async_command_launch(CMD_USERINIT, args, &server);
 		}
+		
+		else if(args[0] == "usercheck")
+		{
+			async_command_launch(CMD_USERCHECK, args, &server);
+		}
     }
     
     console_last_command = command;
@@ -277,15 +282,19 @@ int main(int argc, char* argv[])
 
 #endif // GULTRA_DEBUG
 
+    // First we create the server
     server_create(&server, server_name);
     server_initialize(&server, server_port, server_max_clients);
+    // We always set the sendpolicy to Crypted, as it is the goal of the project.
     server_setsendpolicy(&server, Gangtella::SP_CRYPTED);
+    
+    // These two functions are used when receiving or uploading files.
 #ifndef GULTRA_DEBUG
     server_setbytesreceivedcallback(&server, bytes_callback);
     server_setbytessendcallback(&server, bytes_callback);
 #endif // GULTRA_DEBUG
 
-    // Creation thread serveur
+    // We launch the Server thread.
     cout << "[Main] Creating Server thread." << endl;
     if(server_launch(&server) != GERROR_NONE)
     {
@@ -294,8 +303,7 @@ int main(int argc, char* argv[])
     }
 
     // Waiting for server to be done
-    while(server.started == false)
-        usleep(2000);
+    server_wait_status(&server, SS_STARTED, 300);
 
     // Creation du client de test
     if(with_client)
@@ -317,7 +325,7 @@ int main(int argc, char* argv[])
         if(tmp == "exit")
         {
             cout << "[Main] Exiting." << endl;
-            pthread_cancel(server.thread);
+            server_stop(&server);
             server_destroy(&server);
             break;
         }

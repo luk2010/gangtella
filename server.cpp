@@ -144,7 +144,7 @@ gerror_t server_create(server_t* server, const std::string& disp_name)
         return GERROR_BADARGS;
 
 #ifdef GULTRA_DEBUG
-    cout << "[Server] Creating server at adress : '" << (uint32_t) server << "'." << endl;
+    cout << "[Server] Creating server at adress : '" << (ptrdiff_t) server << "'." << endl;
     cout << "[Server] Name = '" << disp_name << "'." << endl;
 #endif // GULTRA_DEBUG
 
@@ -152,6 +152,7 @@ gerror_t server_create(server_t* server, const std::string& disp_name)
     server->started = false;
     server->name    = disp_name;
     server->crypt   = nullptr;
+    server->status  = SS_STOPPED;
 
 #ifdef GULTRA_DEBUG
     cout << "[Server] Creating RSA encryption key." << endl;
@@ -319,7 +320,7 @@ int server_initialize(server_t* server, size_t port, int maxclients)
 
         cout << "[Server] Ready to listen on port '" << port << "'." << endl;
         server->started = true;
-        server->port    = port;
+        server->port    = (uint32_t) port;
     }
     gthread_mutex_unlock(&server->mutex);
 
@@ -640,7 +641,7 @@ void* server_client_thread_loop(void* data)
 
         if(!pclient || pclient->m_type == PT_CLIENT_CLOSING_CONNECTION)
         {
-            // Client send PT_CLOSING_CONNECTION if it wants tis server to destroy the client object.
+            // Client send PT_CLOSING_CONNECTION if it wants this server to destroy the client object.
             // We close the socket, destroy the client but don't send any packet.
 
             uint32_t cid = ID_CLIENT_INVALID;
@@ -658,13 +659,9 @@ void* server_client_thread_loop(void* data)
             
             if(client->logged)
 			{
-				// We try to save the user if it has not already been saved.
-				if(!user_is_loaded(client->logged_user.name))
-				{
-					udatabase->users[client->logged_user.name].name = client->logged_user.name;
-					udatabase->users[client->logged_user.name].key  = client->logged_user.key;
-					udatabase->users[client->logged_user.name].iv   = client->logged_user.iv;
-				}
+				// We destroy the user and log off.
+				user_destroy(client->logged_user);
+				client->logged = false;
 			}
 
             cout << "[Server]{" << client->name << "} Closed client." << endl;
@@ -702,7 +699,9 @@ void* server_client_thread_loop(void* data)
 				dbclient_t dbc;
 				dbc.ip   = std::string(inet_ntoa(client->address.sin_addr));
 				dbc.port = std::to_string(ntohs(client->mirror->address.sin_port));
-				udatabase->clients.push_back(dbc);
+				
+				if(!user_database_clientisloaded(dbc))
+					udatabase->clients.push_back(dbc);
 			}
         }
 
@@ -717,23 +716,37 @@ void* server_client_thread_loop(void* data)
 				// Verify that user isn't already accepted.
 				if(udatabase->users.find(uip->data.name) != udatabase->users.end())
 				{
+					user_t& user = udatabase->users[uip->data.name];
+					if(user.key != std::string(uip->data.key) ||
+							user.iv != std::string(uip->data.iv) )
+					{
+						cout << "[Server]{" << client->name << "} User '" << user.name << "' is already in your" 
+						     << " database, but with another key. Please tell user not to change his key, or he is" 
+						     << " an usurpator." << endl;
+						org->client_send(client->mirror, PT_USER_INIT_AEXIST, NULL, 0);
+					}
+					
+					else
+					{
 #ifndef GULTRA_DEBUG
-					cout << "[Server]{" << client->name << "} Sending user info." << endl;
+						cout << "[Server]{" << client->name << "} Sending user info." << endl;
 #endif // GULTRA_DEBUG
 					
-					// User is already accepted, so register it normally.
-					user_init_t uinit;
-					strcpy(uinit.name, org->logged_user.name.c_str());
-					strcpy(uinit.key,  org->logged_user.key.c_str());
-					strcpy(uinit.iv,   org->logged_user.iv.c_str());
-					org->client_send(client->mirror, PT_USER_INIT_RESPONSE, &uinit, sizeof(uinit));
+						// User is already accepted, so register it normally.
+						user_init_t uinit;
+						strcpy(uinit.name, org->logged_user.name.c_str());
+						strcpy(uinit.key,  org->logged_user.key.c_str());
+						strcpy(uinit.iv,   org->logged_user.iv.c_str());
+						org->client_send(client->mirror, PT_USER_INIT_RESPONSE, &uinit, sizeof(uinit));
 			
-					client->logged_user.name = std::string(uip->data.name);
-					client->logged_user.key  = std::string(uip->data.key);
-					client->logged_user.iv   = std::string(uip->data.iv);
-					client->logged           = true;
+						client->logged_user.name = std::string(uip->data.name);
+						client->logged_user.key  = std::string(uip->data.key);
+						client->logged_user.iv   = std::string(uip->data.iv);
+						client->logged           = true;
 					
-					cout << "[Server]{" << client->name << "} User '" << uip->data.name << "' accepted." << endl;
+						cout << "[Server]{" << client->name << "} User '" << uip->data.name << "' accepted." << endl;
+					}
+					
 				}
 				
 				else 
@@ -795,6 +808,8 @@ void* server_client_thread_loop(void* data)
 			cout << "[Server]{" << client->name << "} Connected user '" << uip->data.name << "'." << endl;
 			
 			client->logged_user.name = std::string(uip->data.name);
+			client->logged_user.key  = std::string(uip->data.key);
+			client->logged_user.iv   = std::string(uip->data.iv);
 			client->logged           = true;
 			delete pclient;
 		}
@@ -809,6 +824,34 @@ void* server_client_thread_loop(void* data)
 		else if(pclient->m_type == PT_USER_INIT_NOTACCEPTED)
 		{
 			cout << "[Server]{" << client->name << "} Client didn't accept you ! I can't do anythig for you..." << endl;
+			delete pclient;
+		}
+		
+		else if(pclient->m_type == PT_USER_INIT_AEXIST)
+		{
+			cout << "[Server]{" << client->name << "} User '" << org->logged_user.name << "' already exists in client database." << endl;
+			delete pclient;
+		}
+		
+		else if(pclient->m_type == PT_USER_END)
+		{
+			cout << "[Server]{" << client->name << "} Unlogging request from user '" << client->logged_user.name << "'." << endl;
+			
+			user_destroy(client->logged_user);
+			client->logged = false;
+			
+			// Now we send the PT_USER_END_RESPONSE packet to notifiate the server to unlog from us too.
+			org->client_send(client->mirror, PT_USER_END_RESPONSE, NULL, 0);
+			delete pclient;
+		}
+		
+		else if(pclient->m_type == PT_USER_END_RESPONSE)
+		{
+			cout << "[Server]{" << client->name << "} Unlogging from user '" << client->logged_user.name << "'." << endl;
+			
+			user_destroy(client->logged_user);
+			client->logged = false;
+			
 			delete pclient;
 		}
 
@@ -1006,6 +1049,65 @@ clientloop_continue:
     return NULL;
 }
 
+/** @brief Notifiates the given client that we want to unlog.
+ *
+ *  @return
+ *  - GERROR_NONE    : No errors occured.
+ *  - GERROR_BADARGS : server or client is null.
+**/
+gerror_t server_end_user_connection(server_t* server, client_t* client)
+{
+	if(!server || !client)
+		return GERROR_BADARGS;
+		
+	if(!server->logged)
+	{
+#ifdef GULTRA_DEBUG
+		cout << "[Server] Can't end user connection while not logged in (logic --')." << endl;
+#endif // GULTRA_DEBUG
+		return GERROR_NONE;
+	}
+	
+	server->client_send(client->mirror, PT_USER_END, NULL, 0);
+	
+	// Now client should send us packet PT_USER_END_RESPONSE and our local client
+	// will unlog from him too.
+	
+	return GERROR_NONE;
+}
+
+/** @brief Unlog user from server and notifiate every clients.
+ *  
+ *  @return
+ *  - GERROR_NONE    : No errors occured.
+ *  - GERROR_BADARGS : server is null.
+**/
+gerror_t server_unlog(server_t* server)
+{
+	if(!server)
+		return GERROR_BADARGS;
+	
+	if(!server->logged)
+	{
+#ifdef GULTRA_DEBUG
+		cout << "[Server] Can't unlog while not logged in (logic --')." << endl;
+#endif // GULTRA_DEBUG
+		return GERROR_NONE;
+	}
+	
+	for(unsigned int i = 0; i < server->clients.size(); ++i)
+	{
+		gerror_t err = server_end_user_connection(server, &(server->clients[i]));
+		if(err != GERROR_NONE)
+			cout << "[Server] Unlog error : (" << server->clients[i].name << ") " << gerror_to_string(err) << endl;
+	}
+	
+	user_destroy(server->logged_user);
+	server->logged = false;
+	cout << "[Server] Correctly unlogged." << endl;
+	return GERROR_NONE;
+}
+
 client_t* server_create_client_thread_loop(server_t* server, client_t* client)
 {
     pthread_t thread_client;
@@ -1025,10 +1127,23 @@ client_t* server_create_client_thread_loop(server_t* server, int i)
 
 void* server_thread_loop(void* __serv)
 {
-    server_t* server = (server_t*) __serv;
+    server_t* server   = (server_t*) __serv;
+    server->status     = SS_STARTED;
+    server->_must_stop = false;
+    
+    // We must create fake client to send ourselves some important packet.
+    // This is a super mirror.
+#ifdef GULTRA_DEBUG
+    cout << "[Server] Creating localhost." << endl;
+#endif
+    client_t* localhostc = nullptr;
+    server_init_client_connection(server, localhostc, "127.0.0.1", server->port);
+    server->localhost = *localhostc;
 
-    while(1)
+    while(!(server->_must_stop))
     {
+        server->status     = SS_STARTED;
+        
         /* A new client come. */
         SOCKADDR_IN csin;
         size_t sin_size = sizeof(csin);
@@ -1055,6 +1170,8 @@ void* server_thread_loop(void* __serv)
 #ifdef GULTRA_DEBUG
                 cout << "[Server] Getting infos from new client." << endl;
 #endif // GULTRA_DEBUG
+                
+                server->status = SS_ADDINGCLIENT;
 
                 ClientInfoPacket* cip = reinterpret_cast<ClientInfoPacket*>(pclient);
 
@@ -1201,8 +1318,20 @@ void* server_thread_loop(void* __serv)
             }
         }
     }
+    
+    server->status = SS_STOPPED;
+    return (void*) GERROR_NONE;
+}
 
-    return 0;
+gerror_t server_stop(server_t* server)
+{
+    if(!server)
+        return GERROR_BADARGS;
+    
+    server->_must_stop = true;
+    closesocket(server->sock);
+    pthread_join(server->thread, nullptr);
+    return GERROR_NONE;
 }
 
 client_t* server_find_client_by_name(server_t* server, const std::string& name)
@@ -1244,6 +1373,19 @@ gerror_t server_init_client_connection(server_t* server, client_t*& out, const c
 {
     if(!server || out != nullptr)
         return GERROR_BADARGS;
+        
+	// We check if connection does not already exist
+	for(unsigned int i = 0; i < server->clients.size(); ++i)
+	{
+		if(std::string(inet_ntoa(server->clients[i].address.sin_addr)) == std::string(adress) && 
+		   port == ntohs(server->clients[i].mirror->address.sin_port) )
+		{
+			cout << "[Server] Client ('" << adress << ":" << port << "') already exist (" << server->clients[i].name << ")." << endl;
+			out = &(server->clients[i]);
+			return GERROR_NONE;
+		}
+		
+	}
 
     // First we create the mirror. It will handle the socket to the client.
     client_t* mirror = new client_t;
@@ -1341,13 +1483,8 @@ void server_end_client(server_t* server, const std::string& client_name)
             
             if(client->logged)
 			{
-				// We try to save the user if it has not already been saved.
-				if(!user_is_loaded(client->logged_user.name))
-				{
-					udatabase->users[client->logged_user.name].name = client->logged_user.name;
-					udatabase->users[client->logged_user.name].key  = client->logged_user.key;
-					udatabase->users[client->logged_user.name].iv   = client->logged_user.iv;
-				}
+				user_destroy(client->logged_user);
+				client->logged = false;
 			}
 
             server->clients.erase(server->clients.begin() + server_find_client_index_private_(server, client_name));
@@ -1426,8 +1563,8 @@ gerror_t server_wait_establisedclient(client_t* client, uint32_t timeout)
 {
 	if(timeout > 0)
 	{
-		uint32_t startTime = time(NULL);
-		uint32_t elapsedTime;
+		time_t startTime = time(NULL);
+		time_t elapsedTime;
 		while(client->established == false)
 		{
 			elapsedTime = difftime(time(NULL), startTime);
@@ -1442,6 +1579,50 @@ gerror_t server_wait_establisedclient(client_t* client, uint32_t timeout)
 		while(client->established == false);
 		return GERROR_NONE;
 	}
+}
+
+/** @brief Check if a client program is valid. 
+ *  
+ *  @warning Not implemented for now. I don't know how to verify
+ *  the program integrity.
+**/
+gerror_t server_check_client(server_t* server, client_t* client)
+{
+    return GERROR_NONE;
+}
+
+/** @brief Returns the server current status.
+**/
+int server_get_status(server_t* server)
+{
+    return (int) server->status;
+}
+
+/** @brief Wait for the server to have a given status, with a given timeout.
+ *  @param server  : Pointer to the server.
+ *  @param status  : Status to wait.
+ *  @param timeout : Maximum time to wait. 0 is infinite.
+**/
+gerror_t server_wait_status(server_t* server, int status, long timeout)
+{
+    if(timeout > 0)
+    {
+        time_t startTime = time(NULL);
+		time_t elapsedTime;
+		while(server->status != status)
+		{
+			elapsedTime = difftime(time(NULL), startTime);
+			if(elapsedTime > timeout)
+				return GERROR_TIMEDOUT;
+		}
+		
+		return GERROR_NONE;
+    }
+    else
+    {
+        while(server->status != status) ;
+        return GERROR_NONE;
+    }
 }
 
 GEND_DECL

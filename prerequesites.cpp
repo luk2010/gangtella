@@ -73,7 +73,7 @@ clock_gettime(int X, struct timeval *tv)
 #define CLOCK_PROCESS_CPUTIME_ID 0
 
 // call this function to start a nanosecond-resolution timer
-struct timespec timer_start(){
+timespec_t timer_start(){
     struct timespec start_time;
 
     struct timeval st_v;
@@ -85,7 +85,7 @@ struct timespec timer_start(){
 }
 
 // call this function to end a timer, returning nanoseconds elapsed as a long
-long timer_end(struct timespec start_time){
+long timer_end(timespec_t start_time){
     struct timespec end_time = timer_start();
 
     long diffInNanos = end_time.tv_nsec - start_time.tv_nsec;
@@ -94,20 +94,37 @@ long timer_end(struct timespec start_time){
 
 #endif // _WIN32
 
-#ifdef _LINUX
+#if defined(_LINUX)
 
 // call this function to start a nanosecond-resolution timer
-struct timespec timer_start(){
+timespec_t timer_start(){
     struct timespec start_time;
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
     return start_time;
 }
 
 // call this function to end a timer, returning nanoseconds elapsed as a long
-long timer_end(struct timespec start_time){
+long timer_end(timespec_t start_time){
     struct timespec end_time;
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end_time);
     long diffInNanos = end_time.tv_nsec - start_time.tv_nsec;
+    return diffInNanos;
+}
+
+#endif
+
+#if defined(_OSX)
+
+// call this function to start a nanosecond-resolution timer
+timespec_t timer_start(){
+    timespec_t start_time = clock_gettime();
+    return start_time;
+}
+
+// call this function to end a timer, returning nanoseconds elapsed as a long
+long timer_end(timespec_t start_time){
+    timespec_t end_time = clock_gettime();
+    long diffInNanos = end_time - start_time;
     return diffInNanos;
 }
 

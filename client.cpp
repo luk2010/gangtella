@@ -267,13 +267,13 @@ gerror_t client_send_file(client_t* client, const char* filename)
     if(is)
     {
         is.seekg(0, is.end);
-        const int lenght = is.tellg();
+        const size_t lenght = is.tellg();
         is.seekg(0, is.beg);
 
         cout << "[Client] Sending file '" << filename << "'." << endl;
 
 #ifdef GULTRA_DEBUG
-        struct timespec st = timer_start();
+        timespec_t st = timer_start();
 #endif // GULTRA_DEBUG
 
         if(lenght < SERVER_MAXBUFSIZE)
@@ -283,7 +283,7 @@ gerror_t client_send_file(client_t* client, const char* filename)
             sft.has_chunk   = false;
             sft.lenght.data = lenght;
 
-            const int flenght = strlen(filename);
+            const size_t flenght = strlen(filename);
             memcpy(sft.name, filename, flenght);
             sft.name[flenght] = '\0';
 
@@ -370,7 +370,7 @@ gerror_t client_send_file(client_t* client, const char* filename)
             sft.chunk_lastsize.data = lenght % SERVER_MAXBUFSIZE;
             sft.chunk_count.data    = ((int) lenght/SERVER_MAXBUFSIZE) + 1;
 
-            const int flenght  = strlen(filename);
+            const size_t flenght  = strlen(filename);
             memcpy(sft.name, filename, flenght);
             sft.name[flenght]  = '\0';
 

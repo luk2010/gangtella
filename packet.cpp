@@ -30,7 +30,7 @@ GBEGIN_DECL
 template <> send_file_t serialize(const send_file_t& src)
 {
     send_file_t sft;
-    sft.lenght         = serialize<uint32_nt>(src.lenght);
+    sft.lenght         = serialize<size_nt>(src.lenght);
     sft.chunk_lenght   = serialize<uint32_nt>(src.chunk_lenght);
     sft.chunk_lastsize = serialize<uint32_nt>(src.chunk_lastsize);
     sft.chunk_count    = serialize<uint32_nt>(src.chunk_count);
@@ -42,7 +42,7 @@ template <> send_file_t serialize(const send_file_t& src)
 template <> send_file_t deserialize(const send_file_t& src)
 {
     send_file_t sft;
-    sft.lenght         = deserialize<uint32_nt>(src.lenght);
+    sft.lenght         = deserialize<size_nt>(src.lenght);
     sft.chunk_lenght   = deserialize<uint32_nt>(src.chunk_lenght);
     sft.chunk_lastsize = deserialize<uint32_nt>(src.chunk_lastsize);
     sft.chunk_count    = deserialize<uint32_nt>(src.chunk_count);
@@ -158,10 +158,10 @@ Packet* receive_client_packet(SOCKET sock)
 
     // Receive data
     data_t max_request[8196];
-    int n = recv(sock, max_request, sizeof(ptp), 0);
+    size_t n = recv(sock, max_request, sizeof(ptp), 0);
 
     // Receive the PT_PACKETTYPE packet first.
-    memcpy(&ptp, max_request, sizeof(ptp));
+    memcpy((void*) &ptp, max_request, sizeof(ptp));
 
     if(ptp.m_type != PT_PACKETTYPE &&
        n > 0)
@@ -184,6 +184,9 @@ Packet* receive_client_packet(SOCKET sock)
 
     // We construct the packet depending on his type.
     Packet* packet = packet_choose_policy(ptp.type);
+    if(!packet)
+        return nullptr;
+    
     data_t* data   = nullptr;
     size_t len     = packet->getPacketSize();
 
@@ -339,6 +342,24 @@ gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size
 	else if(type == PT_USER_INIT_NOTLOGGED)
 	{
 		packet->m_type = PT_USER_INIT_NOTLOGGED;
+		return GERROR_NONE;
+	}
+	
+	else if(type == PT_USER_INIT_AEXIST)
+	{
+		packet->m_type = PT_USER_INIT_AEXIST;
+		return GERROR_NONE;
+	}
+	
+	else if(type == PT_USER_END)
+	{
+		packet->m_type = PT_USER_END;
+		return GERROR_NONE;
+	}
+	
+	else if(type == PT_USER_END_RESPONSE)
+	{
+		packet->m_type = PT_USER_END_RESPONSE;
 		return GERROR_NONE;
 	}
 

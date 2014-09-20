@@ -29,10 +29,12 @@
 #define GVERSION_MAJ   "0"
 #define GVERSION_MIN   "1"
 
+#define _DEBUG
+
 #ifdef _DEBUG
-#define GVERSION_BUILD "7d"
+#define GVERSION_BUILD "9d"
 #else
-#define GVERSION_BUILD "7"
+#define GVERSION_BUILD "9"
 #endif // _DEBUG
 
 #define GANGTELLA_VERSION GVERSION_MAJ "." GVERSION_MIN "." GVERSION_BUILD
@@ -85,6 +87,7 @@
 #include <winsock2.h>
 
 typedef char data_t; // This type is used to send or recv data.
+typedef struct timespec timespec_t;
 
 /* ******************************************************************* */
 
@@ -99,6 +102,13 @@ typedef char data_t; // This type is used to send or recv data.
 
 #include <sys/types.h>
 #include <sys/socket.h>
+
+#ifdef _OSX
+#   include <sys/time.h>
+#   define CLOCK_PROCESS_CPUTIME_ID CLOCKS_PER_SEC
+#   define clock_gettime clock
+#endif
+
 #include <netinet/in.h>
 #include <arpa/inet.h>
 //#include <unistd.h> /* close */
@@ -111,10 +121,32 @@ typedef struct sockaddr_in SOCKADDR_IN;
 typedef struct sockaddr    SOCKADDR;
 typedef struct in_addr     IN_ADDR;
 typedef unsigned char      data_t;     // This type is used to send or recv data.
+typedef struct timespec    timespec_t;
 
 /* ******************************************************************* */
 
+#elif defined (_OSX)
 
+#include <sys/types.h>
+#include <sys/socket.h>
+
+#include <sys/time.h>
+#define CLOCK_PROCESS_CPUTIME_ID CLOCKS_PER_SEC
+#define clock_gettime clock
+
+#include <netinet/in.h>
+#include <arpa/inet.h>
+//#include <unistd.h> /* close */
+#include <netdb.h> /* gethostbyname */
+#define INVALID_SOCKET -1
+#define SOCKET_ERROR -1
+#define closesocket(s) close(s)
+typedef int SOCKET;
+typedef struct sockaddr_in SOCKADDR_IN;
+typedef struct sockaddr    SOCKADDR;
+typedef struct in_addr     IN_ADDR;
+typedef unsigned char      data_t;     // This type is used to send or recv data.
+typedef long               timespec_t;
 
 #else
 
@@ -207,10 +239,10 @@ const char* gerror_to_string(gerror_t& err);
 // Taken from http://stackoverflow.com/questions/6749621/high-resolution-timer-in-linux
 
 // call this function to start a nanosecond-resolution timer
-struct timespec timer_start();
+timespec_t timer_start();
 
 // call this function to end a timer, returning nanoseconds elapsed as a long
-long timer_end(struct timespec start_time);
+long timer_end(timespec_t start_time);
 
 /* Example
 

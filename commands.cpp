@@ -25,8 +25,8 @@
 
 GBEGIN_DECL
 
-std::streambuf* coutbuf = nullptr;
-std::string console_last_command = "";
+std::streambuf* coutbuf              = nullptr;
+std::string     console_last_command = "";
 
 #undef cout
 #undef endl
@@ -58,6 +58,19 @@ std::string console_get_lastcommand()
 	return console_last_command;
 }
 
+/** @brief Wait for a command to be typed.
+ *  
+ *  If you want the user to type something for you that is not a valid command, use 
+ *  this method to retrieve it. 
+ *
+ *  Use : 
+ *  console_reset_lastcommand(); 
+ *  console_waitfor_command();
+ *  std::string customcmd = console_get_lastcommand();
+ *
+ *  @note
+ *  This function is blocking. It is not very thread-safe, you should use it with care.
+**/
 void console_waitfor_command()
 {
 	std::string cpy = console_last_command;
@@ -114,7 +127,8 @@ async_cmd_t async_commands [CMD_MAX] =
 	{ CMD_INFO,        async_cmd_info        },
 	{ CMD_OPENCLIENT,  async_cmd_openclient  },
 	{ CMD_CLOSECLIENT, async_cmd_closeclient },
-	{ CMD_SENDFILE,    async_cmd_sendfile    }
+	{ CMD_SENDFILE,    async_cmd_sendfile    },
+	{ CMD_USERCHECK,   async_cmd_usercheck   }
 };
 
 GEND_DECL

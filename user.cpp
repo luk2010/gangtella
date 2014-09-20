@@ -311,4 +311,19 @@ bool user_is_loaded(const std::string& name)
 	return udatabase ? udatabase->users.find(name) != udatabase->users.end() : false;
 }
 
+/** @brief Returns true if client is already loaded in
+ *  database.
+**/
+bool user_database_clientisloaded(const dbclient_t& client)
+{
+	for(unsigned int i = 0; i < udatabase->clients.size(); ++i)
+	{
+		if(udatabase->clients[i].ip   == client.ip && 
+		   udatabase->clients[i].port == client.port) 
+			return true;
+	}
+	
+	return false;
+}
+
 GEND_DECL

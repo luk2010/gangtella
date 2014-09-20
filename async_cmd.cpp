@@ -64,9 +64,14 @@ gerror_t async_cmd_userlogin(std::vector<std::string> args, server_t* server)
 **/
 gerror_t async_cmd_userunlog(std::vector<std::string>, server_t* server)
 {
-	user_destroy(server->logged_user);
-	server->logged = false;
-	cout << "[Command] Logged as 'null'." << endl;
+	gerror_t err = server_unlog(server);
+	
+	if(err == GERROR_NONE) {
+		cout << "[Command] Logged as 'null'." << endl;
+	}
+	else {
+		cout << "[Command] Unlogged but error occured : '" << gerror_to_string(err) << "'" << endl;
+	}
 	
 	return GERROR_NONE;
 }
@@ -218,6 +223,37 @@ gerror_t async_cmd_sendfile(std::vector<std::string> args, server_t* server)
 	{
 		cout << "[Command]<help> sendfile [client name] [file path]" << endl;
 		cout << "[Command]<help> Send given file to given client."   << endl;
+	}
+	
+	return GERROR_NONE;
+}
+
+/** @brief Requests given user to give a 512 bits set to check if program
+ *  is okay. 
+ *
+ *  This command is used to check that a client has the same program as this 
+ *  server. You can use it to be sure that the client you are connecting to is
+ *  not a spy, a bot or other things.
+ *  It ask for 512 random bitts and compare with itself.
+ *
+ *  @return
+ *  - GERROR_NONE
+**/
+gerror_t async_cmd_usercheck(std::vector<std::string> args, server_t* server)
+{
+	if(args.size() > 1)
+	{
+		std::string cname = args[1];
+		client_t* client  = server_find_client_by_name(server, cname);
+		if(client != NULL)
+		{
+			return server_check_client(server, client);
+		}
+	}
+	
+	else
+	{
+		cout << "[Command]<help> usercheck [client name]" << endl;
 	}
 	
 	return GERROR_NONE;

@@ -41,12 +41,20 @@ typedef enum {
     SP_CRYPTED = 2
 } SendPolicy;
 
+typedef enum {
+    SS_STOPPED          = 0,
+    SS_STARTED          = 1,
+    SS_ADDINGCLIENT     = 2
+    
+} ServerStatus;
+
 typedef struct _server_ {
     SOCKET                sock;
 
     std::string           name;         // Name displayed to other servers. This name is send to the client.
     std::vector<client_t> clients;      // List of activated clients.
     ClientsIdMap          client_by_id; // Every clients by ID. This list is updated for every clients connection or deconnection.
+    client_t              localhost;    // A local client used to send packet to this server.
 
     pthread_mutex_t       mutex;
     pthread_t             thread;
@@ -62,11 +70,15 @@ typedef struct _server_ {
     
     user_t				  logged_user;  // Current user logged in.
     bool 				  logged;       // True if logged in.
+    
+    ServerStatus          status;       // Current status of the server. (By default it is SS_STOPPED then SS_STARTED).
+    bool                  _must_stop;   // [Private] True when server must stop the threading loop.
 } server_t;
 
 gerror_t server_create    					(server_t* server, const std::string& disp_name);
 gerror_t server_initialize					(server_t* server, size_t port, int maxclients);
 gerror_t server_launch    					(server_t* server);
+gerror_t server_stop                        (server_t* server);
 gerror_t server_destroy   					(server_t* server);
 
 gerror_t server_setsendpolicy				(server_t* server, int policy);
@@ -79,9 +91,17 @@ client_t* server_find_client_by_name		(server_t* server, const std::string& name
 gerror_t server_abort_operation				(server_t* server, client_t* client);
 
 gerror_t server_init_user_connection		(server_t* server, user_t& out, const char* adress, size_t port);
+gerror_t server_end_user_connection         (server_t* server, client_t* client);
+gerror_t server_unlog                       (server_t* server);
+
 gerror_t server_init_client_connection		(server_t* server, client_t*& out, const char* adress, size_t port);
 gerror_t server_wait_establisedclient	    (client_t* client, uint32_t timeout = 0);
 void server_end_client						(server_t* server, const std::string& client_name);
+gerror_t server_check_client                (server_t* server, client_t* client);
+
+int      server_get_status                  (server_t* server);
+gerror_t server_wait_status                 (server_t* server, int status, long timeout = 0);
+
 
 GEND_DECL
 

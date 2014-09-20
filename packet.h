@@ -15,7 +15,7 @@ GBEGIN_DECL
 **/
 struct send_file_t
 {
-    uint32_nt  lenght;                  ///< @brief File total lenght
+    size_nt    lenght;                  ///< @brief File total lenght
     uint32_nt  chunk_lenght;            ///< @brief Non-last chunk lenght
     uint32_nt  chunk_lastsize;          ///< @brief last chunk lenght
     uint32_nt  chunk_count;             ///< @brief Chunk count (including last chunk)
@@ -89,7 +89,10 @@ typedef enum PacketType {
     PT_USER_INIT                 = 13,
     PT_USER_INIT_RESPONSE        = 14,
     PT_USER_INIT_NOTACCEPTED     = 15,
-    PT_USER_INIT_NOTLOGGED       = 16
+    PT_USER_INIT_NOTLOGGED       = 16,
+    PT_USER_INIT_AEXIST          = 17,
+    PT_USER_END					 = 18,
+    PT_USER_END_RESPONSE		 = 19
 } PacketType;
 
 /** @brief A generic class representing a Packet.

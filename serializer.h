@@ -34,6 +34,11 @@ typedef union {
 } uint32_nt;
 
 typedef union {
+    unsigned long data;
+    byte_t        bytes[8];
+} size_nt;
+
+typedef union {
     float    data;
     uint32_t i;
     byte_t   bytes[4];
@@ -59,6 +64,7 @@ template <> uint8_nt  serialize(const uint8_nt& );
 template <> uint16_nt serialize(const uint16_nt&);
 template <> uint32_nt serialize(const uint32_nt&);
 template <> float_nt  serialize(const float_nt& );
+template <> size_nt   serialize(const size_nt&);
 template <> uint64_nt serialize(const uint64_nt&);
 
 template<class To, class From>
@@ -70,6 +76,7 @@ template <> uint8_nt  deserialize(const uint8_nt&);
 template <> uint16_nt deserialize(const uint16_nt&);
 template <> uint32_nt deserialize(const uint32_nt&);
 template <> float_nt  deserialize(const float_nt& );
+template <> size_nt   deserialize(const size_nt&);
 template <> uint64_nt deserialize(const uint64_nt&);
 
 GEND_DECL

@@ -48,8 +48,9 @@ typedef enum {
 	CMD_OPENCLIENT  = 5,
 	CMD_CLOSECLIENT = 6,
 	CMD_SENDFILE    = 7,
+	CMD_USERCHECK   = 8,
 	
-	CMD_MAX         = 8
+	CMD_MAX         = 9
 } Commands;
 
 typedef struct async_cmd_
@@ -68,6 +69,7 @@ gerror_t async_cmd_info        (std::vector<std::string> args, server_t* server)
 gerror_t async_cmd_openclient  (std::vector<std::string> args, server_t* server);
 gerror_t async_cmd_closeclient (std::vector<std::string> args, server_t* server);
 gerror_t async_cmd_sendfile    (std::vector<std::string> args, server_t* server);
+gerror_t async_cmd_usercheck   (std::vector<std::string> args, server_t* server);
 
 // This array makes us call any commands where we want.
 extern async_cmd_t async_commands[CMD_MAX];

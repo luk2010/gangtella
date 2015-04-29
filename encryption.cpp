@@ -105,7 +105,7 @@ namespace Encryption
     int crypt(encryption_t* rsa, unsigned char* to, unsigned char* from, size_t flen)
     {
         // Crypt from private key
-        int result = RSA_private_encrypt(flen, from, to, rsa->keypair, RSA_PKCS1_PADDING);
+        int result = RSA_private_encrypt((int) flen, from, to, rsa->keypair, RSA_PKCS1_PADDING);
         return result;
     }
 
@@ -119,7 +119,7 @@ namespace Encryption
     int decrypt(buffer_t& pubkey, unsigned char* to, unsigned char* from, size_t flen)
     {
         RSA* rsa   = createRSA(pubkey.buf, 1);
-        int result = RSA_public_decrypt(flen, from, to, rsa, RSA_PKCS1_PADDING);
+        int result = RSA_public_decrypt((int) flen, from, to, rsa, RSA_PKCS1_PADDING);
         RSA_free(rsa);
         return result;
     }
@@ -129,7 +129,7 @@ namespace Encryption
         if(!enc || !out)
             return GERROR_BADARGS;
 
-        int err = GERROR_NONE;
+        GError err = GERROR_NONE;
         biobox_t bio;
         bio.bio = nullptr;
         bio.buf.size = 0;
@@ -138,7 +138,7 @@ namespace Encryption
         cout << "[Encryption] Creating BIO buffer." << endl;
 #endif // GULTRA_DEBUG
 
-        err = bio_create_newbuffer(&bio);
+        err = (GError) bio_create_newbuffer(&bio);
         if(err != GERROR_NONE)
         {
 #ifdef GULTRA_DEBUG
@@ -206,7 +206,7 @@ namespace Encryption
             return GERROR_BADARGS;
 
         out->size = BIO_ctrl_pending(bio->bio);
-        if (BIO_read(bio->bio, (void*) out->buf, out->size) < 0) {
+        if (BIO_read(bio->bio, (void*) out->buf, (int) out->size) < 0) {
             out->size = 0;
             return GERROR_ENCRYPT_BIOREAD;
         }
@@ -275,7 +275,7 @@ namespace Encryption
 		unsigned char uiv[EVP_MAX_IV_LENGTH];
 		memset(uiv, 0, EVP_MAX_IV_LENGTH);
 		
-		int err = EVP_BytesToKey(cipher, dgst, NULL, (unsigned char*) passwd, passwdsz, 4, ukey, uiv);
+		int err = EVP_BytesToKey(cipher, dgst, NULL, (unsigned char*) passwd, (int) passwdsz, 4, ukey, uiv);
 		
 		if(!err)
 		{
@@ -311,7 +311,7 @@ namespace Encryption
 		return GERROR_NONE;
     }
     
-    bool user_check_password(std::string& inkey, std::string& iniv, const char* passwd, size_t passwdsz)
+    bool user_check_password(std::string inkey, std::string iniv, const char* passwd, size_t passwdsz)
     {	
 		std::string cmp1key, cmp1iv;
 		user_create_keypass(cmp1key, cmp1iv, passwd, passwdsz);
@@ -321,6 +321,127 @@ namespace Encryption
 			   !cmp1key.empty() &&
 			   !inkey.empty();
     }
+    
+    gerror_t AESCrypt(unsigned char* inbuf, uint32_t inbufsize, unsigned char*& outbuf, int* outlen, std::string& key, std::string& iv, bool encrypt)
+    {
+        unsigned int blocksize;
+        EVP_CIPHER_CTX ctx;
+        
+        int out_len;
+        int tot_len = 0;
+        unsigned char* cur = inbuf;
+        int tot_read = 0;
+        unsigned int readbufsize = 4096;
+        unsigned char* readbuf = (unsigned char*) malloc(readbufsize);
+        unsigned char* end = inbuf + inbufsize - 1;
+        
+        EVP_CipherInit(&ctx, EVP_aes_256_cbc(), (unsigned char*) key.c_str(), (unsigned char*) iv.c_str(), encrypt ? 1 : 0);
+        blocksize = EVP_CIPHER_CTX_block_size(&ctx);
+        unsigned char* cipherbuf = (unsigned char*) malloc(blocksize + readbufsize);
+        
+        if(blocksize >= inbufsize)
+        {
+            EVP_CipherUpdate(&ctx, cipherbuf, &out_len, inbuf, inbufsize);
+            EVP_CipherFinal(&ctx, cipherbuf, &out_len);
+            outbuf = (unsigned char*) malloc(out_len);
+            memcpy(outbuf, cipherbuf, out_len);
+            
+            if(outlen)
+                *outlen = out_len;
+        }
+        else
+        {
+            while (cur != end)
+            {
+                int tmp = tot_len;
+                
+                if(end - cur + 1 >= readbufsize)
+                {
+                    memcpy(readbuf, cur, readbufsize);
+                    EVP_CipherUpdate(&ctx, cipherbuf, &out_len, readbuf, readbufsize);
+                    
+                    cur = cur + readbufsize;
+                    tot_read += readbufsize;
+                    tot_len += out_len;
+                }
+                else
+                {
+                    // last block, so break after
+                    memcpy(readbuf, cur, end - cur + 1);
+                    EVP_CipherUpdate(&ctx, cipherbuf, &out_len, readbuf, (int) (end - cur + 1));
+                    
+                    cur = end;
+                    tot_read += end - cur + 1;
+                    tot_len += out_len;
+                }
+                
+                // Write the output in the out buffer.
+                outbuf = (unsigned char*) realloc(outbuf, tot_len);
+                
+                if(tmp)
+                    memcpy(outbuf + tmp, cipherbuf, out_len);
+                else
+                    memcpy(outbuf, cipherbuf, out_len);
+            }
+            
+            EVP_CipherFinal(&ctx, cipherbuf, &out_len);
+            outbuf = (unsigned char*) realloc(outbuf, tot_len + out_len);
+            memcpy(outbuf + tot_len, cipherbuf, out_len);
+            
+            if(outlen)
+                *outlen = tot_len + out_len;
+        }
+        
+        return GERROR_NONE;
+    }
+    
+    gerror_t aes256_file(bool should_encrypt, FILE* ifp, FILE* ofp, unsigned char* ckey, unsigned char* ivec)
+    {
+        const unsigned BUFSIZE = 4096;
+        unsigned char *read_buf = (unsigned char*) malloc(BUFSIZE);
+        unsigned char *cipher_buf;
+        unsigned blocksize;
+        int out_len;
+        EVP_CIPHER_CTX ctx;
+        
+        EVP_CipherInit(&ctx, EVP_aes_256_cbc(), ckey, ivec, should_encrypt);
+        blocksize = EVP_CIPHER_CTX_block_size(&ctx);
+        cipher_buf = (unsigned char*) malloc(BUFSIZE + blocksize);
+        
+        while (1) {
+            
+            // Read in data in blocks until EOF. Update the ciphering with each read.
+            
+            int numRead = (int) fread(read_buf, sizeof(unsigned char), BUFSIZE, ifp);
+            EVP_CipherUpdate(&ctx, cipher_buf, &out_len, read_buf, numRead);
+            fwrite(cipher_buf, sizeof(unsigned char), out_len, ofp);
+            
+#ifdef GULTRA_DEBUG
+            cout << "[aes256_file] Read " << out_len << " bytes." << endl;
+#endif
+            
+            if (numRead < BUFSIZE) { // EOF
+                break;
+            }
+        }
+        
+        // Now cipher the final block and write it out.
+        
+        EVP_CipherFinal(&ctx, cipher_buf, &out_len);
+        fwrite(cipher_buf, sizeof(unsigned char), out_len, ofp);
+        
+        // Free memory
+        
+        free(cipher_buf);
+        free(read_buf);
+        
+        return GERROR_NONE;
+    }
+}
+
+gerror_t encryption_init()
+{
+    return Encryption::Init();
 }
 
 GEND_DECL

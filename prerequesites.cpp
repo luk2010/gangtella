@@ -7,6 +7,7 @@
 GBEGIN_DECL
 
 pthread_mutex_t __console_mutex = PTHREAD_MUTEX_INITIALIZER;
+session_t globalsession;
 
 #ifdef _WIN32
 
@@ -200,10 +201,40 @@ static const char* __errors [GERROR_MAX] = {
     "Incorrect password given.",
     "Cipher requested not found.",
     "(OpenSSL) EVP_BytesToKey failed.",
-    "Time out has expired."
+    "Time out has expired.",
+    "Network identifier not found in database.",
+    "Network given invalid or null.",
+    "Network already initialized.",
+    "Sorry, feature not implemented for now.",
+    "Bad user data given.",
+    "(Win) Not suitable Windows Socket version.",
+    "Can't allocate some memory.",
+    "Packet answer is PT_RECEIVED_BAD. Errors occured during the reception of the packet.",
+    "Can't have a valid answer packet.",
+    "Database version is not the same as the program database interpreter.",
+    "Database [autosave] flag has incorrect value.",
+    "No OpenSSl could be initialized on this platform.",
+    "Can't generate Public Key.",
+    "No password provided for database.",
+    "Can't find correct header in database.",
+    "Can't decrypt database block.",
+    "Database is bad encoded, or something is really wrong.",
+    "No user provided.",
+    "No user password provided.",
+    "No packets have been received.",
+    "(GCrypt) Bad Position token in file."
 };
 
-const char* gerror_to_string(gerror_t& err)
+const char* gerror_to_string(GError err)
+{
+    size_t idx = (size_t) err;
+    if(idx < GERROR_MAX)
+        return __errors[idx];
+    else
+        return "";
+}
+
+const char* gerror_to_string(gerror_t err)
 {
     size_t idx = (size_t) err;
     if(idx < GERROR_MAX)
@@ -220,5 +251,196 @@ gerror_t buffer_copy(buffer_t& dest, const buffer_t& src)
 
     return GERROR_NONE;
 }
+
+// From http://oopweb.com/CPP/Documents/CPPHOWTO/Volume/C++Programming-HOWTO-7.html
+void Tokenize(const std::string& str,
+              std::vector<std::string>& tokens,
+              const std::string& delimiters)
+{
+    // Skip delimiters at beginning.
+    std::string::size_type lastPos = str.find_first_not_of(delimiters, 0);
+    // Find first "non-delimiter".
+    std::string::size_type pos     = str.find_first_of(delimiters, lastPos);
+    
+    while (std::string::npos != pos || std::string::npos != lastPos)
+    {
+        // Found a token, add it to the vector.
+        tokens.push_back(str.substr(lastPos, pos - lastPos));
+        // Skip delimiters.  Note the "not_of"
+        lastPos = str.find_first_not_of(delimiters, pos);
+        // Find next "non-delimiter"
+        pos = str.find_first_of(delimiters, lastPos);
+    }
+}
+
+gerror_t NetworkInit()
+{
+#ifdef _WIN32
+    
+#ifdef GULTRA_DEBUG
+    cout << "[Server] Starting WSA2.0." << endl;
+#endif // GULTRA_DEBUG
+    
+    int err;
+    WSAData wsadata;
+    err = WSAStartup(MAKEWORD(2, 0), &wsadata);
+    if(err == WSASYSNOTREADY)
+    {
+        cout << "[Server] Could not start Windows Socket : "
+        << "The underlying network subsystem is not ready for network communication." << endl;
+        return GERROR_WSASTARTUP;
+    }
+    else if(err == WSAVERNOTSUPPORTED)
+    {
+        cout << "[Server] Could not start Windows Socket : "
+        << "The version of Windows Sockets support requested is not provided by this particular Windows Sockets implementation." << endl;
+        return GERROR_WSASTARTUP;
+    }
+    else if(err == WSAEINPROGRESS)
+    {
+        cout << "[Server] Could not start Windows Socket : "
+        << "A blocking Windows Sockets 1.1 operation is in progress." << endl;
+        return GERROR_WSASTARTUP;
+    }
+    else if(err == WSAEPROCLIM)
+    {
+        cout << "[Server] Could not start Windows Socket : "
+        << "A limit on the number of tasks supported by the Windows Sockets implementation has been reached." << endl;
+        return GERROR_WSASTARTUP;
+    }
+    else if(err == WSAEFAULT)
+    {
+        cout << "[Server] Could not start Windows Socket : "
+        << "The lpWSAData parameter is not a valid pointer." << endl;
+        return GERROR_WSASTARTUP;
+    }
+    else if(LOBYTE(wsdata.wVersion) != 2 ||
+            HIBYTE(wsdata.wVersion) != 0)
+    {
+        cout << "[Server] Invalid Windows Socket version. Could not found a suitable socket "
+             << "implementation." << endl;
+        WSACleanup();
+        return GERROR_WSAVERSION;
+    }
+    
+#endif // _WIN32
+    
+    return GERROR_NONE;
+}
+
+ssize_t grecv(int socket, void* buffer, size_t lenght, int flags)
+{
+    ssize_t ret = recv(socket, buffer, lenght, flags);
+    if(ret == -1)
+    {
+        if(errno == EAGAIN ||
+           errno == EWOULDBLOCK)
+        {
+            cout << "[grecv] No data is waiting to be received." << endl;
+        }
+        else if(errno == EBADF)
+        {
+            cout << "[grecv] Bad socket given !" << endl;
+        }
+        else if(errno == ETIMEDOUT)
+        {
+            cout << "[grecv] The connection timed out during connection establishment, "
+                 << "or due to a transmission timeout on active connection." << endl;
+        }
+    }
+    
+    return ret;
+}
+
+#ifndef _WIN32
+
+int getch() {
+    int ch;
+    struct termios t_old, t_new;
+    
+    tcgetattr(STDIN_FILENO, &t_old);
+    t_new = t_old;
+    t_new.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &t_new);
+    
+    ch = getchar();
+    
+    tcsetattr(STDIN_FILENO, TCSANOW, &t_old);
+    return ch;
+}
+
+#endif
+
+std::string getpass(bool show_asterisk)
+{
+#ifdef _WIN32 // Windows version
+    
+    const char BACKSPACE=8;
+    const char RETURN=13;
+    
+    std::string password;
+    unsigned char ch=0;
+    
+    DWORD con_mode;
+    DWORD dwRead;
+    
+    HANDLE hIn=GetStdHandle(STD_INPUT_HANDLE);
+    
+    GetConsoleMode( hIn, &con_mode );
+    SetConsoleMode( hIn, con_mode & ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT) );
+    
+    while(ReadConsoleA( hIn, &ch, 1, &dwRead, NULL) && ch !=RETURN)
+    {
+        if(ch==BACKSPACE)
+        {
+            if(password.length()!=0)
+            {
+                if(show_asterisk)
+                    cout <<"\b \b"; gthread_mutex_unlock(&__console_mutex);
+                password.resize(password.length()-1);
+            }
+        }
+        else
+        {
+            password+=ch;
+            if(show_asterisk)
+                cout <<'*'; gthread_mutex_unlock(&__console_mutex);
+        }
+    }
+    cout << endl;
+    return password;
+    
+#else // Unix version
+    
+    const char BACKSPACE=127;
+    const char RETURN=10;
+    
+    std::string password;
+    unsigned char ch=0;
+    
+    while((ch=getch())!=RETURN)
+    {
+        if(ch==BACKSPACE)
+        {
+            if(password.length()!=0)
+            {
+                if(show_asterisk)
+                    cout <<"\b \b"; gthread_mutex_unlock(&__console_mutex);
+                password.resize(password.length()-1);
+            }
+        }
+        else
+        {
+            password+=ch;
+            if(show_asterisk)
+                cout <<'*'; gthread_mutex_unlock(&__console_mutex);
+        }
+    }
+    cout << endl;
+    return password;
+
+#endif
+}
+
 
 GEND_DECL

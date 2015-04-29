@@ -30,10 +30,10 @@ GBEGIN_DECL
 template <> send_file_t serialize(const send_file_t& src)
 {
     send_file_t sft;
-    sft.lenght         = serialize<size_nt>(src.lenght);
-    sft.chunk_lenght   = serialize<uint32_nt>(src.chunk_lenght);
-    sft.chunk_lastsize = serialize<uint32_nt>(src.chunk_lastsize);
-    sft.chunk_count    = serialize<uint32_nt>(src.chunk_count);
+    sft.lenght         = serialize<size_t>(src.lenght);
+    sft.chunk_lenght   = serialize<uint32_t>(src.chunk_lenght);
+    sft.chunk_lastsize = serialize<uint32_t>(src.chunk_lastsize);
+    sft.chunk_count    = serialize<uint32_t>(src.chunk_count);
     sft.has_chunk      = src.has_chunk;
     memcpy(sft.name, src.name, SERVER_MAXBUFSIZE);
     return sft;
@@ -42,10 +42,10 @@ template <> send_file_t serialize(const send_file_t& src)
 template <> send_file_t deserialize(const send_file_t& src)
 {
     send_file_t sft;
-    sft.lenght         = deserialize<size_nt>(src.lenght);
-    sft.chunk_lenght   = deserialize<uint32_nt>(src.chunk_lenght);
-    sft.chunk_lastsize = deserialize<uint32_nt>(src.chunk_lastsize);
-    sft.chunk_count    = deserialize<uint32_nt>(src.chunk_count);
+    sft.lenght         = deserialize<size_t>(src.lenght);
+    sft.chunk_lenght   = deserialize<uint32_t>(src.chunk_lenght);
+    sft.chunk_lastsize = deserialize<uint32_t>(src.chunk_lastsize);
+    sft.chunk_count    = deserialize<uint32_t>(src.chunk_count);
     sft.has_chunk      = src.has_chunk;
     memcpy(sft.name, src.name, SERVER_MAXBUFSIZE);
     return sft;
@@ -54,9 +54,9 @@ template <> send_file_t deserialize(const send_file_t& src)
 template <> client_info_t serialize(const client_info_t& src)
 {
     client_info_t cit;
-    cit.id     = serialize<uint32_nt>(src.id);
-    cit.idret  = serialize<uint32_nt>(src.idret);
-    cit.s_port = serialize<uint32_nt>(src.s_port);
+    cit.id     = serialize<uint32_t>(src.id);
+    cit.idret  = serialize<uint32_t>(src.idret);
+    cit.s_port = serialize<uint32_t>(src.s_port);
     memcpy(cit.name, src.name, SERVER_MAXBUFSIZE);
     buffer_copy(cit.pubkey, src.pubkey);
     return cit;
@@ -65,9 +65,9 @@ template <> client_info_t serialize(const client_info_t& src)
 template <> client_info_t deserialize(const client_info_t& src)
 {
     client_info_t cit;
-    cit.id     = deserialize<uint32_nt>(src.id);
-    cit.idret  = deserialize<uint32_nt>(src.idret);
-    cit.s_port = deserialize<uint32_nt>(src.s_port);
+    cit.id     = deserialize<uint32_t>(src.id);
+    cit.idret  = deserialize<uint32_t>(src.idret);
+    cit.s_port = deserialize<uint32_t>(src.s_port);
     memcpy(cit.name, src.name, SERVER_MAXBUFSIZE);
     buffer_copy(cit.pubkey, src.pubkey);
     return cit;
@@ -77,8 +77,8 @@ template <> encrypted_info_t serialize(const encrypted_info_t& src)
 {
     encrypted_info_t eit;
     eit.ptype = src.ptype;
-    eit.cryptedblock_number = serialize<uint32_nt>(src.cryptedblock_number);
-    eit.cryptedblock_lastsz = serialize<uint32_nt>(src.cryptedblock_lastsz);
+    eit.cryptedblock_number = serialize<uint32_t>(src.cryptedblock_number);
+    eit.cryptedblock_lastsz = serialize<uint32_t>(src.cryptedblock_lastsz);
     return eit;
 }
 
@@ -86,8 +86,8 @@ template <> encrypted_info_t deserialize(const encrypted_info_t& src)
 {
     encrypted_info_t eit;
     eit.ptype = src.ptype;
-    eit.cryptedblock_number = deserialize<uint32_nt>(src.cryptedblock_number);
-    eit.cryptedblock_lastsz = deserialize<uint32_nt>(src.cryptedblock_lastsz);
+    eit.cryptedblock_number = deserialize<uint32_t>(src.cryptedblock_number);
+    eit.cryptedblock_lastsz = deserialize<uint32_t>(src.cryptedblock_lastsz);
     return eit;
 }
 
@@ -137,7 +137,11 @@ Packet* packet_choose_policy(const int type)
     }
 }
 
-/** @brief Receive a client packet.
+/** @brief Receive a client packet with a time out.
+ *
+ *  This time out is, for now, fixed to 3 seconds. 
+ *  If you want to wait untill a new packet come with connection status
+ *  management, use packet_wait().
  *
  *  @note
  *  This function is a low-level function.
@@ -153,15 +157,31 @@ Packet* receive_client_packet(SOCKET sock)
 {
     if(!sock)
         return NULL;
+    
+    // Set timeout to 3sec
+    struct timeval tv;
+    tv.tv_usec = 0;
+    tv.tv_sec  = 3;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,(char*) &tv, sizeof(struct timeval));
 
     PacketTypePacket ptp;
 
     // Receive data
     data_t max_request[8196];
-    size_t n = recv(sock, max_request, sizeof(ptp), 0);
+    ssize_t n = recv(sock, max_request, sizeof(ptp), 0);
+    
+    if(n == -1)
+    {
+        // An error occured
+        return nullptr;
+    }
 
     // Receive the PT_PACKETTYPE packet first.
     memcpy((void*) &ptp, max_request, sizeof(ptp));
+    
+    // Preparing data
+    Packet* packet = nullptr;
+    bool skipdata = false;
 
     if(ptp.m_type != PT_PACKETTYPE &&
        n > 0)
@@ -179,41 +199,67 @@ Packet* receive_client_packet(SOCKET sock)
 #endif // GULTRA_DEBUG
 
         // Return it
-        return retv;
+        packet = (Packet*) retv;
+        skipdata = true;
     }
-
-    // We construct the packet depending on his type.
-    Packet* packet = packet_choose_policy(ptp.type);
-    if(!packet)
-        return nullptr;
     
-    data_t* data   = nullptr;
-    size_t len     = packet->getPacketSize();
-
-    if(len > 0)
+    if(!skipdata)
     {
-        data = (data_t*) malloc(len);
-        memset(data, 0, len);
-        len = recv(sock, data, len, 0);
-    }
-
-    // Interpret the packet
-    gerror_t err = packet_interpret(ptp.type, packet, data, len);
-    if(err != GERROR_NONE)
-    {
-        // Destroy the packet
-        delete packet;
-        packet = nullptr;
-
-        // Show the error
+        // We construct the packet depending on his type.
+        packet = packet_choose_policy(ptp.type);
+        if(!packet)
+            return nullptr;
+        
+        data_t* data   = nullptr;
+        size_t len     = packet->getPacketSize();
+        
+        if(len > 0)
+        {
+            data = (data_t*) malloc(len);
+            memset(data, 0, len);
+            len = recv(sock, data, len, 0);
+        }
+        
+        // Interpret the packet
+        gerror_t err = packet_interpret(ptp.type, packet, data, len);
+        if(err != GERROR_NONE)
+        {
+            // Destroy the packet
+            delete packet;
+            packet = nullptr;
+            
+            // Show the error
 #ifdef GULTRA_DEBUG
-        cout << "[Packet] Can't interpret packet : " << gerror_to_string(err) << endl;
+            cout << "[Packet] Can't interpret packet : " << gerror_to_string(err) << endl;
 #endif // GULTRA_DEBUG
+        }
+        
+        // Clean
+        if(data)
+            free(data);
     }
-
-    // Clean
-    if(data)
-        free(data);
+    
+    // If we are not receiving an answer, we must send an appropriate answer.
+    // PT_RECEIVED_BAD if packet is null, or if packet type is PT_UNKNOWN
+    // PT_RECEIVED_OK in other cases.
+    
+    if(packet)
+    {
+        if(packet->m_type != PT_RECEIVED_OK &&
+           packet->m_type != PT_RECEIVED_BAD)
+        {
+            if(packet->m_type != PT_UNKNOWN)
+                send_client_packet(sock, PT_RECEIVED_OK, nullptr, 0);
+            else
+                send_client_packet(sock, PT_RECEIVED_BAD, nullptr, 0);
+        }
+    }
+    else
+    {
+        send_client_packet(sock, PT_RECEIVED_BAD, nullptr, 0);
+    }
+    
+    // Return the packet.
     return packet;
 }
 
@@ -241,6 +287,14 @@ gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size
 
     if(len != packet->getPacketSize())
         return GERROR_BADARGS;
+    
+    if(type >= PT_MAX)
+    {
+        cout << "[Packet] Unknown packet type received : '" << (uint32_t) type << "'." << endl;
+        return GERROR_INVALID_PACKET;
+    }
+    
+    packet->m_type = type;
 
     if(type == PT_CLIENT_NAME)
     {
@@ -248,7 +302,6 @@ gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size
         memcpy(cnp->buffer, data, len);
 
         cnp->buffer[len] = '\0';
-        return GERROR_NONE;
     }
 
     else if(type == PT_CLIENT_MESSAGE)
@@ -257,7 +310,6 @@ gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size
         memcpy(cnp->buffer, data, len);
 
         cnp->buffer[len] = '\0';
-        return GERROR_NONE;
     }
 
     else if(type == PT_CLIENT_INFO)
@@ -265,21 +317,6 @@ gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size
         ClientInfoPacket* cip = reinterpret_cast<ClientInfoPacket*>(packet);
         memcpy(&(cip->info), data, len);
         cip->info = deserialize<client_info_t>(cip->info);
-        return GERROR_NONE;
-    }
-
-    else if(type == PT_CLIENT_CLOSING_CONNECTION)
-    {
-        Packet* ccp = packet;
-        ccp->m_type = PT_CLIENT_CLOSING_CONNECTION;
-        return GERROR_NONE;
-    }
-
-    else if(type == PT_CLIENT_ESTABLISHED)
-    {
-        Packet* ccp = packet;
-        ccp->m_type = PT_CLIENT_ESTABLISHED;
-        return GERROR_NONE;
     }
 
     else if(type == PT_CLIENT_SENDFILE_INFO)
@@ -287,21 +324,12 @@ gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size
         ClientSendFileInfoPacket* csfip = reinterpret_cast<ClientSendFileInfoPacket*>(packet);
         memcpy(&(csfip->info), data, len);
         csfip->info = deserialize<send_file_t>(csfip->info);
-        return GERROR_NONE;
     }
 
     else if(type == PT_CLIENT_SENDFILE_CHUNK)
     {
         ClientSendFileChunkPacket* csfcp = reinterpret_cast<ClientSendFileChunkPacket*>(packet);
         memcpy(csfcp->chunk, data, len);
-        return GERROR_NONE;
-    }
-
-    else if(type == PT_CLIENT_SENDFILE_TERMINATE)
-    {
-        Packet* ccp = packet;
-        ccp->m_type = PT_CLIENT_SENDFILE_TERMINATE;
-        return GERROR_NONE;
     }
 
     else if(type == PT_ENCRYPTED_INFO)
@@ -309,62 +337,78 @@ gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size
         EncryptedInfoPacket* eip = reinterpret_cast<EncryptedInfoPacket*>(packet);
         memcpy(&(eip->info), data, len);
         eip->info = deserialize<encrypted_info_t>(eip->info);
-        return GERROR_NONE;
     }
 
     else if(type == PT_ENCRYPTED_CHUNK)
     {
         EncryptedChunkPacket* ecp = reinterpret_cast<EncryptedChunkPacket*>(packet);
         memcpy(&(ecp->chunk), data, len);
-        return GERROR_NONE;
     }
     
     else if(type == PT_USER_INIT)
 	{
 		UserInitPacket* uip = reinterpret_cast<UserInitPacket*>(packet);
 		memcpy(&(uip->data), data, len);
-		return GERROR_NONE;
 	}
 	
 	else if(type == PT_USER_INIT_RESPONSE)
 	{
 		UserInitRPacket* uip = reinterpret_cast<UserInitRPacket*>(packet);
 		memcpy(&(uip->data), data, len);
-		return GERROR_NONE;
 	}
-	
-	else if(type == PT_USER_INIT_NOTACCEPTED)
-	{
-		packet->m_type = PT_USER_INIT_NOTACCEPTED;
-		return GERROR_NONE;
-	}
-	
-	else if(type == PT_USER_INIT_NOTLOGGED)
-	{
-		packet->m_type = PT_USER_INIT_NOTLOGGED;
-		return GERROR_NONE;
-	}
-	
-	else if(type == PT_USER_INIT_AEXIST)
-	{
-		packet->m_type = PT_USER_INIT_AEXIST;
-		return GERROR_NONE;
-	}
-	
-	else if(type == PT_USER_END)
-	{
-		packet->m_type = PT_USER_END;
-		return GERROR_NONE;
-	}
-	
-	else if(type == PT_USER_END_RESPONSE)
-	{
-		packet->m_type = PT_USER_END_RESPONSE;
-		return GERROR_NONE;
-	}
+    
+    return GERROR_NONE;
+}
 
-    cout << "[Packet] Unknown packet type received : '" << (uint32_t) type << "'." << endl;
-    return GERROR_INVALID_PACKET;
+/** @brief Wait for a packet to come.
+ *  
+ *  This is a blocking function. It waits untill a packet is received. 
+ *  Everytimes the recv function timed out, it send a Connection Status packet
+ *  to check validity of the connection.
+ *
+ *  @param sock : Socket to wait.
+ *  @param retpacket : A pointer to null.
+**/
+gerror_t packet_wait(SOCKET sock, PacketPtr& retpacket)
+{
+    if(!sock || retpacket != nullptr)
+        return GERROR_BADARGS;
+    
+    while (!retpacket)
+    {
+        // First we wait 3 seconds for a packet to come.
+        retpacket = receive_client_packet(sock);
+        
+        if(retpacket)
+        {
+            // If we received a packet, we can return.
+            return GERROR_NONE;
+        }
+        
+        else
+        {
+            // If nothing has been received, just send a connection status packet
+            // to check connection with the socket.
+            gerror_t err = send_client_packet(sock, PT_CONNECTIONSTATUS, nullptr, 0);
+            if(err != GERROR_NONE)
+            {
+#ifdef GULTRA_DEBUG
+                cout << "[Packet] Error sending connection status : " << gerror_to_string(err) << endl;
+#endif
+                // If we can't have any answer, return the error.
+                return err;
+            }
+            else
+            {
+                // In debug mode, notifiate we send correctly the checking status.
+#ifdef GULTRA_DEBUG
+                cout << "[Packet] Checked connection status with SOCK '" << sock << "' OK." << endl;
+#endif
+            }
+        }
+    }
+    
+    return GERROR_NONE;
 }
 
 /** @brief Send a packet to given host using given socket.
@@ -413,8 +457,40 @@ gerror_t send_client_packet(SOCKET sock, uint8_t packet_type, const void* data, 
             return GERROR_CANT_SEND_PACKET;
         }
     }
+    
+    // If packet sent is not an answer, we must wait for a correct
+    // answer from the socket, wich may be of type PT_RECEIVED_OK
+    // or PT_RECEIVED_BAD.
+    
+    gerror_t ret = GERROR_NONE;
+    
+    if(packet_type != PT_RECEIVED_BAD &&
+       packet_type != PT_RECEIVED_OK)
+    {
+        // Wait for the answer packet
+        Packet* panswer = receive_client_packet(sock);
+        if(panswer)
+        {
+            if(panswer->m_type == PT_RECEIVED_OK)
+            {
+                ret = GERROR_NONE;
+            }
+            else if(panswer->m_type == PT_RECEIVED_BAD)
+            {
+                ret = GERROR_ANSWER_BAD;
+            }
+            else
+            {
+                ret = GERROR_ANSWER_INVALID;
+            }
+        }
+        else
+        {
+            ret = GERROR_ANSWER_INVALID;
+        }
+    }
 
-    return GERROR_NONE;
+    return ret;
 }
 
 /** @brief Return an unsigned char* buffer and give the size

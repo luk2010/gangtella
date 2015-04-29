@@ -82,15 +82,24 @@ typedef struct
 	command_func_t           cmd;
 	std::vector<std::string> args;
 	server_t*                server;
+    bool                     inbackground;
 } async_cmd_private_t;
 
 void* async_cmd_thread_loop (void* d)
 {
+    globalsession._treatingcommand = true;
+    
 	async_cmd_private_t* data = (async_cmd_private_t*) d;
+    
+    if(data->inbackground) globalsession._treatingcommand = false;
 	
-	if(data)
+    if(data)
+    {
 		data->cmd(data->args, data->server);
+        delete data;
+    }
 	
+    globalsession._treatingcommand = false;
 	return NULL;
 }
 
@@ -100,9 +109,10 @@ void* async_cmd_thread_loop (void* d)
  *  @param args     : A vector containing every args in the command line. @note args[0] is the
  *  command name.
  *  @param server   : A pointer to the current server.
+ *  @param _background : Set this to true if you want the command to be launched in background.
  *
 **/
-void async_command_launch(int cmd_type, const std::vector<std::string>& args, server_t* server)
+void async_command_launch(int cmd_type, const std::vector<std::string>& args, server_t* server, bool _background)
 {
 	if(cmd_type < CMD_MAX && cmd_type > CMD_UNKNOWN)
 	{
@@ -112,6 +122,7 @@ void async_command_launch(int cmd_type, const std::vector<std::string>& args, se
 		cmd_private->cmd    = cmd;
 		cmd_private->args   = args;
 		cmd_private->server = server;
+        cmd_private->inbackground = _background;
 		
 		pthread_t _thread;
 		pthread_create(&_thread, 0, async_cmd_thread_loop, cmd_private);
@@ -128,7 +139,12 @@ async_cmd_t async_commands [CMD_MAX] =
 	{ CMD_OPENCLIENT,  async_cmd_openclient  },
 	{ CMD_CLOSECLIENT, async_cmd_closeclient },
 	{ CMD_SENDFILE,    async_cmd_sendfile    },
-	{ CMD_USERCHECK,   async_cmd_usercheck   }
+	{ CMD_USERCHECK,   async_cmd_usercheck   },
+    { CMD_NET_ATTACH,  async_cmd_netattach   },
+    
+    // New API
+    
+    { CMD_VERSION,     async_cmd_version     }
 };
 
 GEND_DECL

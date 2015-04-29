@@ -57,10 +57,19 @@ namespace Encryption
     gerror_t bio_read_all(biobox_t* bio, buffer_t* out);
     
     gerror_t user_create_keypass(std::string& outkey, std::string& outiv, const char* passwd, size_t passwdsz);
-	bool	 user_check_password(std::string& inkey, std::string& iniv, const char* passwd, size_t passwdsz);
+	bool	 user_check_password(std::string inkey, std::string iniv, const char* passwd, size_t passwdsz);
+    
+    /* Encrypt / Decrypt with AES 256.
+     Adapted from : http://stackoverflow.com/questions/24856303/openssl-aes-256-cbc-via-evp-api-in-c
+    */
+    gerror_t AESCrypt(unsigned char* inbuf, uint32_t inbufsize, unsigned char*& outbuf, int* outlen, std::string& key, std::string& iv, bool encrypt);
+    
+    gerror_t aes256_file(bool should_encrypt, FILE* ifp, FILE* ofp, unsigned char* ckey, unsigned char* ivec);
 }
 
 typedef Encryption::encryption_t crypt_t;
+
+gerror_t encryption_init();
 
 GEND_DECL
 

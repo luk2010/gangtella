@@ -5,7 +5,7 @@
 
 /*
     GangTella Project
-    Copyright (C) 2014  Luk2010
+    Copyright (C) 2014 - 2015  Luk2010
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -26,10 +26,9 @@
 #include "packet.h"
 #include "client.h"
 #include "server.h"
+#include "database.h"
 
 using namespace Gangtella;
-
-server_t  server;
 
 void treat_command(const std::string& command)
 {
@@ -67,7 +66,6 @@ void treat_command(const std::string& command)
                 cout << "[Command]<help> Send a message to given active client." << endl;
             }
         }
-
 
 
         else if(args[0] == "messageall")
@@ -114,34 +112,40 @@ void treat_command(const std::string& command)
         {
             async_command_launch(CMD_CLOSECLIENT, args, &server);
         }
-        
+
         else if(args[0] == "userlogin")
 		{
 			// This is a beta test
 			async_command_launch(CMD_USERLOGIN, args, &server);
 		}
-		
+
 		else if(args[0] == "userunlog")
 		{
 			// This is a beta test
 			async_command_launch(CMD_USERUNLOG, args, &server);
 		}
-		
+
 		else if(args[0] == "userinit")
 		{
 			// This is a beta test
 			async_command_launch(CMD_USERINIT, args, &server);
 		}
-		
+
 		else if(args[0] == "usercheck")
 		{
 			async_command_launch(CMD_USERCHECK, args, &server);
 		}
+
+        else if(args[0] == "version")
+        {
+            async_command_launch(CMD_VERSION, args, globalsession.server);
+        }
     }
-    
+
     console_last_command = command;
 }
 
+// Displays a cool loading bar on the screen.
 void bytes_callback(const std::string& name, size_t current, size_t total)
 {
     cout << "\r " << name << " : ";
@@ -165,29 +169,38 @@ void bytes_callback(const std::string& name, size_t current, size_t total)
 
 void display_help()
 {
-    cout << "GangTella is a free server&client connector to the Gang Network." << endl;
+    cout << "GangTella is a free server & client connector to the Gang Network." << endl;
     cout << "This program is FREE SOFTWARE and is distributed with NO WARRANTY." << endl;
     cout << "If you have any kind of problems with it, " << endl;
 	cout << "you can send a mail to 'alain.ratatouille@gmail.com' (for suggestions it is the same adress :) ) . " << endl; cout
 	     << "Uses    : gangtella [options]" << endl; cout
 		 << "Options : " << endl; cout
-			<< " --s-port      : Specify a custom port for the Server."             << endl; cout
-			<< "                 Default is 8377."                                  << endl; cout
-			<< " --s-name      : Specify a custom name for the Server. This name "  << endl; cout
-			<< "                 is shown to every one who connect to this server." << endl; cout
-			<< " --c-adress    : Specify the IP adress for the automated"           << endl; cout
-			<< "                 created client. Default is 127.0.0.1 (for test)."  << endl; cout
-			<< " --c-port      : Specify a port for the automated created client."  << endl; cout
-			<< "                 Default is 8378."                                  << endl; cout
-			<< " --no-client   : Specify the program not to create a client at the" << endl; cout
-			<< "                 beginning. This option is cool when you do not "   << endl; cout
-			<< "                 test the program."                                 << endl; cout
-			<< " --max-clients : Specify a max number of clients. Default is 10."   << endl; cout
-			<< " --max-buffer  : Specify the Maximum buffer size for a packet. "    << endl; cout
-			<< "                 Default is 1096."                                  << endl; cout
-			<< " --help        : Show this text."                                   << endl; cout
-			<< " --usr-help    : Show a help text on how to connect to the Network."<< endl; cout
-			<< " --version     : Show the version number."                          << endl;
+
+    << "== Important args (user, password, database) ==" << endl; cout
+
+    << " --username    : Uses given username to connect. You should also provide" << endl; cout
+    << "                 your password using --userpass." << endl; cout
+    << " --userpass    : Uses given password, for given username." << endl; cout
+    << " --dbname      : Uses given database. You should provide password with --dbpass." << endl; cout
+    << " --dbpass      : Uses given password according to --dbname argument." << endl; cout
+
+    << "== Low-level args ==" << endl; cout
+
+    << " --s-port      : Specify a custom port for the Server."             << endl; cout
+    << "                 Default is 8377."                                  << endl; cout
+    << " --s-name      : Specify a custom name for the Server. This name "  << endl; cout
+    << "                 is shown to every one who connect to this server." << endl; cout
+    << " --max-clients : Specify a max number of clients. Default is 10."   << endl; cout
+    << " --max-buffer  : Specify the Maximum buffer size for a packet. "    << endl; cout
+    << "                 Default is 1096."                                  << endl; cout
+    << " --no-ssl      : Begins a session without OpenSSL (at your own risk.)" << endl; cout
+
+    << "== Others args ==" << endl; cout
+
+    << " --help        : Show this text."                                   << endl; cout
+    << " --usr-help    : Show a help text on how to connect to the Network."<< endl; cout
+    << " --version     : Show the version number."                          << endl;
+
 }
 
 void display_user_help()
@@ -197,60 +210,48 @@ void display_user_help()
     cout << "If you have any kind of problems with it, " << endl;
 	cout << "you can send a mail to 'alain.ratatouille@gmail.com' (for suggestions it is the same adress :) ) . " << endl; cout
 		 << "User connection : You need a password and a username. Then, it will connect to the nearest " << endl; cout
-		 << "trusted server wich will approve (if it knows you) or disapprove you to enter the network." << endl; 
+		 << "trusted server wich will approve (if it knows you) or disapprove you to enter the network." << endl;
 }
 
 int main(int argc, char* argv[])
 {
     cout << "GangTella v." << GANGTELLA_VERSION << "."  << endl;
 
-    // Init OpenSSL
-    Encryption::Init();
+
 
     // Argues
 
-    int server_port           = SERVER_PORT;
-    std::string server_name   = "Default";
-    std::string client_adress = "127.0.0.1";
-    int client_port           = CLIENT_PORT;
-    bool with_client          = false;
-    int server_max_clients    = SERVER_MAXCLIENTS;
-    int server_max_bufsize    = SERVER_MAXBUFSIZE;
+    server.args.port          = 8378;
+    server.args.name          = "Default";
+    server.args.maxclients    = 10;
+    server.args.maxbufsize    = 1024;
+    server.args.withssl       = true;
+
+    std::string username("");
+    std::string ncuserpass("");
+    std::string dbname("");
+    std::string ncdbpass("");
 
     for(int i = 0; i < argc; ++i)
     {
         if(std::string("--s-port") == argv[i])
         {
-            server_port = atoi(argv[i+1]);
+            server.args.port = atoi(argv[i+1]);
             i++;
         }
         else if(std::string("--s-name") == argv[i])
         {
-            server_name = argv[i+1];
+            server.args.name = argv[i+1];
             i++;
-        }
-        else if(std::string("--c-adress") == argv[i])
-        {
-            client_adress = argv[i+1];
-            i++;
-        }
-        else if(std::string("--c-port") == argv[i])
-        {
-            client_port = atoi(argv[i+1]);
-            i++;
-        }
-        else if(std::string("--no-client") == argv[i])
-        {
-            with_client = false;
         }
         else if(std::string("--max-clients") == argv[i])
         {
-            server_max_clients = atoi(argv[i+1]);
+            server.args.maxclients = atoi(argv[i+1]);
             i++;
         }
         else if(std::string("--max-buffer") == argv[i])
         {
-            server_max_bufsize = atoi(argv[i+1]);
+            server.args.maxbufsize = atoi(argv[i+1]);
             i++;
         }
         else if(std::string("--help") == argv[i])
@@ -259,68 +260,258 @@ int main(int argc, char* argv[])
             return 0;
         }
         else if(std::string("--usr-help") == argv[i])
-		{
-			display_user_help();
-			return 0;
-		}
-		else if(std::string("--version") == argv[i])
-		{
-			return 0;
-		}
+        {
+            display_user_help();
+            return 0;
+        }
+        else if(std::string("--version") == argv[i])
+        {
+            return 0;
+        }
+        else if(std::string("--no-ssl") == argv[i])
+        {
+            server.args.withssl = false;
+        }
+        else if(std::string("--username") == argv[i])
+        {
+            username = argv[i+1];
+            i++;
+        }
+        else if(std::string("--userpass") == argv[i])
+        {
+            ncuserpass = argv[i+1];
+            i++;
+        }
+        else if(std::string("--dbname") == argv[i])
+        {
+            dbname = argv[i+1];
+            i++;
+        }
+        else if(std::string("--dbpass") == argv[i])
+        {
+            ncdbpass = argv[i+1];
+            i++;
+        }
     }
+
+    // Initialize encryption unit.
+
+    if(server.args.withssl) {
+        if(encryption_init() != GERROR_NONE) {
+            cout << "[Main] Can't initialize OpenSSl." << endl;
+            exit(GERROR_ENCRYPT_NOSSL);
+        }
+    }
+
+    if(server.args.withssl == false) {
+        cout << "[Main] Sorry, uncrypted sessions are not allowed anymore." << endl;
+        exit(GERROR_ENCRYPT_NOSSL);
+    }
+
+    // Check the args. Ask for them if we do not have. (database)
+
+    if(dbname.empty())
+    {
+        cout << "[Main] No database provided ! Try to use default one ? [Y/n]" << endl;
+        cout << ":> "; gthread_mutex_unlock(&__console_mutex);
+
+        char buf[server.args.maxbufsize];
+        std::cin.getline(buf, server.args.maxbufsize - 1);
+
+        std::string answer(buf);
+        if(answer != "n" && answer != "N") {
+            dbname = "default_database.db";
+        }
+        else {
+            cout << "[Main] Please specify database path : " << endl;
+            cout << ":>"; gthread_mutex_unlock(&__console_mutex);
+
+            char buf2[server.args.maxbufsize];
+            std::cin.getline(buf2, server.args.maxbufsize - 1);
+
+            answer = buf2;
+            if(answer.empty()) {
+                cout << "[Main] No database provided !! Exiting." << endl;
+                exit(GERROR_USR_NODB);
+            }
+
+            dbname = answer;
+        }
+    }
+
+    if(ncdbpass.empty())
+    {
+        cout << "[Main] Please provide password for database '" << dbname << "' : " << endl;
+        cout << ":> "; gthread_mutex_unlock(&__console_mutex);
+
+        std::string ncpass = getpass();
+        if(ncpass.empty()) {
+            cout << "[Main] No password provided. Exiting." << endl;
+            exit(GERROR_USR_NODBPASS);
+        }
+
+        ncdbpass = ncpass;
+    }
+
+    // Now opens the database.
+
+    database_t* database = nullptr;
+    if(database_load(database,dbname, ncdbpass) != GERROR_NONE) {
+        cout << "[Main] Can't load database '" << dbname << "'. Exiting." << endl;
+        exit(GERROR_USR_NODB);
+    }
+
+    // Now check the user input.
+
+    user_t* user = (user_t*) malloc(sizeof(user_t));
+    user->lkey = 0;
+    user->liv = 0;
+
+    if(username.empty())
+    {
+        cout << "[Main] No username provided ! Please type username : " << endl;
+        cout << ":> "; gthread_mutex_unlock(&__console_mutex);
+
+        char buf[server.args.maxbufsize];
+        std::cin.getline(buf, server.args.maxbufsize - 1);
+
+        std::string answer(buf);
+        if(answer.empty()) {
+            exit(GERROR_NOUSER);
+        }
+
+        username = answer;
+    }
+
+    database_user_t* dbuser = database_find_user(database, username);
+    if(!dbuser)
+    {
+        cout << "[Main] User '" << username << "' does not exist in database '" << dbname << "'." << endl;
+        cout << "[Main] Do you want to create it ? [Y/n]" << endl;
+        cout << ":> "; gthread_mutex_unlock(&__console_mutex);
+
+        char buf[server.args.maxbufsize];
+        std::cin.getline(buf, server.args.maxbufsize - 1);
+
+        std::string answer = buf;
+        if(answer.empty()) {
+            exit(GERROR_NOUSER);
+        }
+
+        if(answer == "n" || answer == "N") {
+            exit(GERROR_NOUSER);
+        }
+
+        if(ncuserpass.empty())
+        {
+            cout << "[Main] Please provide password for user '" << username << "' : " << endl;
+            cout << ":> "; gthread_mutex_unlock(&__console_mutex);
+
+            std::string ncpass = getpass();
+            if(ncpass.empty()) {
+                cout << "[Main] No password provided. Exiting." << endl;
+                exit(GERROR_NOUSERPASS);
+            }
+
+            ncuserpass = ncpass;
+        }
+
+        // Create the new user
+        dbuser = database_create_user(database, username, ncuserpass);
+    }
+
+    user = dbuser;
+
+    // Check the password
+
+    if(ncuserpass.empty())
+    {
+        cout << "[Main] Please provide password for user '" << username << "' : " << endl;
+        cout << ":> "; gthread_mutex_unlock(&__console_mutex);
+
+        std::string ncpass = getpass();
+        if(ncpass.empty()) {
+            cout << "[Main] No password provided. Exiting." << endl;
+            exit(GERROR_NOUSERPASS);
+        }
+
+        ncuserpass = ncpass;
+    }
+
+    std::string tmp1(user->key);
+    std::string tmp2(user->iv);
+
+    if(!Encryption::user_check_password(tmp1, tmp2, ncuserpass.c_str(), ncuserpass.size())) {
+        cout << "[Main] Wrong password. Exiting." << endl;
+        exit(GERROR_USR_BADPSWD);
+    }
+
+    // Now, we have a valid session.
+
+    globalsession.database = database;
+    globalsession.user     = user;
+    globalsession.server   = &server;
+
+    // In debug mode, we display some usefull informations for the running user.
 
 #ifdef GULTRA_DEBUG
-    cout << "[Main] Server Name   = '" << server_name << "'." << endl;
-    cout << "[Main] Server Port   = '" << server_port << "'." << endl;
-    if(with_client) {
-    cout << "[Main] Client Adress = '" << client_adress << "'." << endl;
-    cout << "[Main] Client Port   = '" << client_port << "." << endl;
+
+    cout << "[Main] Server Name   = '" << server.args.name << "'." << endl;
+    cout << "[Main] Server Port   = '" << server.args.port << "'." << endl;
+    cout << "[Main] Server Max Client = '" << server.args.maxclients << "'." << endl;
+    cout << "[Main] Server Max Buffer = '" << server.args.maxbufsize << "'." << endl;
+
+#endif // GULTRA_DEBUG
+
+    // Creating the server to accept connections.
+
+    server_create();
+    server_initialize();
+
+    // User always should use the Crypted version, but at his own risk he can use the
+    // noncrypted one. Thought other server may require that yours should be using
+    // crypting.
+    // [Note] 19/04/2015 : No uncrypted sessions allowed. Program exits before creating
+    // an uncrypted server.
+
+    if(server.args.withssl) {
+        server_setsendpolicy(&server, Gangtella::SP_CRYPTED);
+    }
+    else {
+        server_setsendpolicy(&server, Gangtella::SP_NORMAL);
     }
 
-    cout << "[Main] Server Max Client = '" << server_max_clients << "'." << endl;
-    cout << "[Main] Server Max Buffer = '" << server_max_bufsize << "'." << endl;
+    // On debug mode, too much informations are displayed at screen so we don't call
+    // these callbacks. But on release mode, these are so cool ;).
 
-#endif // GULTRA_DEBUG
-
-    // First we create the server
-    server_create(&server, server_name);
-    server_initialize(&server, server_port, server_max_clients);
-    // We always set the sendpolicy to Crypted, as it is the goal of the project.
-    server_setsendpolicy(&server, Gangtella::SP_CRYPTED);
-    
-    // These two functions are used when receiving or uploading files.
 #ifndef GULTRA_DEBUG
-    server_setbytesreceivedcallback(&server, bytes_callback);
-    server_setbytessendcallback(&server, bytes_callback);
+    server_setbytesreceivedcallback(&server, bytes_callback);// Receiving file.
+    server_setbytessendcallback    (&server, bytes_callback);// Sending file.
 #endif // GULTRA_DEBUG
 
-    // We launch the Server thread.
+    // Create the server thread and launch it.
+    // If the server can't start, we abort the program.
+
     cout << "[Main] Creating Server thread." << endl;
     if(server_launch(&server) != GERROR_NONE)
     {
-        std::cerr << "[Main] Couldn't launch server !!! Aborting." << endl;
-        return 0;
+        cout << "[Main] Couldn't launch server !!! Aborting." << endl;
+        exit(EXIT_FAILURE);
     }
 
-    // Waiting for server to be done
-    server_wait_status(&server, SS_STARTED, 300);
-
-    // Creation du client de test
-    if(with_client)
+    if(server_wait_status(&server, SS_STARTED, 300) != GERROR_NONE)
     {
-        cout << "[Main] Initializing client." << endl;
-        client_t* tmp = nullptr; server_init_client_connection(&server, tmp, client_adress.c_str(), client_port);
+        cout << "[Main] Could not start server ! Aborting." << endl;
+        exit(EXIT_FAILURE);
     }
 
-    // Waiting for client to be done
-    usleep(2000);
-
+    globalsession._treatingcommand = false;
     std::string tmp;
     while(1)
     {
-        char buf[server_max_bufsize];
-        cout << ":> "; gthread_mutex_unlock(&__console_mutex);
-        std::cin.getline(buf, server_max_bufsize - 1);
+        char buf[server.args.maxbufsize];
+        cout << "@" << (const char*) globalsession.user->name << ":> "; gthread_mutex_unlock(&__console_mutex);
+        std::cin.getline(buf, server.args.maxbufsize - 1);
         tmp = buf;
         if(tmp == "exit")
         {
@@ -332,8 +523,12 @@ int main(int argc, char* argv[])
         else
         {
             treat_command(tmp);
+            while(globalsession._treatingcommand);
         }
     }
+    
+    cout << "[Main] Saving database '" << globalsession.database->name << "'." << endl;
+    database_save(globalsession.database);
 
     cout << "[Main] Goodbye." << endl;
     return 0;

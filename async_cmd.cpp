@@ -42,9 +42,9 @@ gerror_t async_cmd_userlogin(std::vector<std::string> args, server_t* server)
 	{
 		std::string username = args[1];
 		std::string pass     = args[2];
-		int err = user_create(server->logged_user, username, pass);
-		if(err == GERROR_NONE) {
-			server->logged = true;
+		int err = user_create(&(globalsession.user), username, pass);
+		if(err == GERROR_NONE && globalsession.user != nullptr) {
+			//server->logged = true;
 			cout << "[Command] Logged as '" << username << "'." << endl;
 		}
 		else
@@ -93,7 +93,7 @@ gerror_t async_cmd_userinit(std::vector<std::string> args, server_t* server)
 	// accepted. If you are new, it will send a request to the client to accept 
 	// you.
 			
-	if(!server->logged)
+	if(!globalsession.user)
 	{
 		cout << "[Command] You must be logged in to init your user connection !" << endl;
 	}
@@ -102,13 +102,12 @@ gerror_t async_cmd_userinit(std::vector<std::string> args, server_t* server)
 	{
 		std::string ipclient   = args[1];
 		std::string portclient = args[2];
-		cout << "[Command] Initializing connection with identity '" << server->logged_user.name << "' to client '" << ipclient
+		cout << "[Command] Initializing connection with identity '" << globalsession.user->name << "' to client '" << ipclient
 			 << ":" << portclient << "'." << endl;
 				
-		user_t clientuser;
-		if(server_init_user_connection(server, clientuser, ipclient.c_str(), atoi(portclient.c_str())) == GERROR_NONE)
+		if(server_init_user_connection(server, ipclient.c_str(), atoi(portclient.c_str())) == GERROR_NONE)
 		{
-			cout << "[Command] User connected to '" << clientuser.name << "'." << endl;
+			cout << "[Command] User connected to '" << globalsession.user->name << "'." << endl;
 		}
 		else
 		{
@@ -257,6 +256,30 @@ gerror_t async_cmd_usercheck(std::vector<std::string> args, server_t* server)
 	}
 	
 	return GERROR_NONE;
+}
+
+/** @brief Attach the server to given network id. 
+ *
+ *  If ID is 0, a new network is created.
+ *  If ID is not 0, see documentation.
+ *
+ *  @note
+ *  Command : network attach ID
+**/
+gerror_t async_cmd_netattach(std::vector<std::string> args, server_t* server)
+{
+    if(args.size() == 3)
+    {
+        
+    }
+    
+    return GERROR_NONE;
+}
+
+gerror_t async_cmd_version(std::vector<std::string> args, server_t* server)
+{
+    cout << "[Command] Version : " << GANGTELLA_VERSION << "." << endl;
+    return GERROR_NONE;
 }
 
 GEND_DECL

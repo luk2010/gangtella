@@ -15,10 +15,10 @@ GBEGIN_DECL
 **/
 struct send_file_t
 {
-    size_nt    lenght;                  ///< @brief File total lenght
-    uint32_nt  chunk_lenght;            ///< @brief Non-last chunk lenght
-    uint32_nt  chunk_lastsize;          ///< @brief last chunk lenght
-    uint32_nt  chunk_count;             ///< @brief Chunk count (including last chunk)
+    size_t    lenght;                  ///< @brief File total lenght
+    uint32_t  chunk_lenght;            ///< @brief Non-last chunk lenght
+    uint32_t  chunk_lastsize;          ///< @brief last chunk lenght
+    uint32_t  chunk_count;             ///< @brief Chunk count (including last chunk)
     bool       has_chunk;               ///< @brief Does this file will be send in chunks ?
     char       name[SERVER_MAXBUFSIZE]; ///< @brief File name
 
@@ -42,9 +42,9 @@ template <> send_file_t deserialize(const send_file_t&);
 **/
 struct client_info_t
 {
-    uint32_nt id;    // ID from mirror struct.
-    uint32_nt idret; // ID from client struct.
-    uint32_nt s_port;// Port for mirror struct.
+    uint32_t id;    // ID from mirror struct.
+    uint32_t idret; // ID from client struct.
+    uint32_t s_port;// Port for mirror struct.
     char      name[SERVER_MAXBUFSIZE];
     buffer_t  pubkey; // Public RSA Key.
 };
@@ -56,8 +56,8 @@ template <> client_info_t deserialize(const client_info_t&);
 **/
 struct encrypted_info_t {
     uint8_t   ptype;               // Packet type of decrypted data
-    uint32_nt cryptedblock_number; // Number of crypted blocks.
-    uint32_nt cryptedblock_lastsz; // Size of last crypted block (once decrypted).
+    uint32_t cryptedblock_number; // Number of crypted blocks.
+    uint32_t cryptedblock_lastsz; // Size of last crypted block (once decrypted).
 };
 
 template <> encrypted_info_t serialize(const encrypted_info_t&);
@@ -92,7 +92,16 @@ typedef enum PacketType {
     PT_USER_INIT_NOTLOGGED       = 16,
     PT_USER_INIT_AEXIST          = 17,
     PT_USER_END					 = 18,
-    PT_USER_END_RESPONSE		 = 19
+    PT_USER_END_RESPONSE		 = 19,
+    PT_RECEIVED_OK               = 20,   // A general answer to every packet. This special packet is send by a client as an answer
+                                         // to notifiate the other client that he correctly received his packet.
+    PT_RECEIVED_BAD              = 21,   // A general answer to every packet. This special packet is send by a client as an answer
+                                         // to notifiate the other client that he did not correctly received his packet.
+    PT_CONNECTIONSTATUS          = 22,   // A packet with no effect. Only wait for a PT_RECEIVED_OK answer. 
+    
+    
+    // The max number of packets.
+    PT_MAX                       = 23
 } PacketType;
 
 /** @brief A generic class representing a Packet.
@@ -303,12 +312,13 @@ public:
 };
 typedef PacketPolicy<PT_USER_INIT_RESPONSE> UserInitRPacket;
 
-
+typedef Packet* PacketPtr;
 
 Packet* packet_choose_policy(const int type);
 gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size_t len);
 gerror_t packet_get_buffer(Packet* p, unsigned char*& buf, size_t& sz);
 
+gerror_t packet_wait          (SOCKET sock, PacketPtr& retpacket);
 Packet*  receive_client_packet(SOCKET sock);
 gerror_t send_client_packet   (SOCKET sock, uint8_t packet_type, const void* data, size_t sz);
 

@@ -24,22 +24,62 @@
 #ifndef __PREREQUESITES__H
 #define __PREREQUESITES__H
 
+/** @mainpage GangTella
+ *
+ *  ### The Goal
+ *
+ *  GangTella has for main purpose to make you easy to create a secret 
+ *  network.
+ *  
+ *  ### Definitions
+ *
+ *  Network : Group of users. A network is defined by a database. The master's
+ *  database contains every users in the network. 
+ *
+ *  Database : A store which contains users, their clients and their accepted
+ *  users. 
+ *
+ *  User : A user is a human. A human is identified in the network using its
+ *  nickname (username), and its key/iv pair (defined by his password).
+ *
+ *  Client : A client is a server which is connected to the user's server.
+ *  Each client is identified by its IP and the port it has to go through.
+ *
+ *  Server : Structure which can handle connections to other servers.
+ *
+ *  ### A quick explanation
+ *
+ *  There are multiple layers in the GangTella network system.
+ *
+ *  - The Server layer : the physical low-level layer which connects two machines.
+ *  It sends crypted informations using a temporary symetric key used by both
+ *  machines. 
+ * 
+ *  - The Crypted layer : A "simple" layer which is a double-crypted 
+ *  information (once by the machine, and a second time by the user).
+ *
+ *  - The User layer : This is the human part. The user layer is used
+ *  to performs commands.
+ *
+**/
+
 /* ******************************************************************* */
 
-#define GVERSION_MAJ   "0"
-#define GVERSION_MIN   "1"
+#define GVERSION_MAJ   "0" ///< @brief The Major version.
+#define GVERSION_MIN   "1" ///< @brief The Minor version.
+
+#define GDB_VERSION    "0A"
 
 #define _DEBUG
+#define _PANIC_ON_ERROR
 
 #ifdef _DEBUG
-#define GVERSION_BUILD "9d"
+#define GVERSION_BUILD "11d"
 #else
-#define GVERSION_BUILD "9"
+#define GVERSION_BUILD "11"
 #endif // _DEBUG
 
 #define GANGTELLA_VERSION GVERSION_MAJ "." GVERSION_MIN "." GVERSION_BUILD
-
-
 
 /*
     These are standards headers. They are common for every operating
@@ -64,17 +104,10 @@
 #include <sstream>
 #include <limits>
 
-// Comment tis line if you do not want the encryption module.
-// THIS IS VERY RECOMMENDED TO KEEP IT
-#define GENCRYPT_RSA
-
-#ifdef GENCRYPT_RSA
-#   include <openssl/rsa.h>
-#endif // GENCRYPT_RSA
+#include <openssl/rsa.h>
 #include <openssl/evp.h>
 
 /* ******************************************************************* */
-
 
 
 
@@ -103,10 +136,13 @@ typedef struct timespec timespec_t;
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include <termios.h>
+
 #ifdef _OSX
 #   include <sys/time.h>
 #   define CLOCK_PROCESS_CPUTIME_ID CLOCKS_PER_SEC
 #   define clock_gettime clock
+#   pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
 
 #include <netinet/in.h>
@@ -130,9 +166,12 @@ typedef struct timespec    timespec_t;
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include <termios.h>
+
 #include <sys/time.h>
 #define CLOCK_PROCESS_CPUTIME_ID CLOCKS_PER_SEC
 #define clock_gettime clock
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -168,15 +207,15 @@ STATIC_ASSERT(sizeof(char)     == 1, invalid_char_size);
 STATIC_ASSERT(sizeof(short)    == 2, invalid_short_size);
 STATIC_ASSERT(sizeof(int)      == 4, invalid_int_size);
 STATIC_ASSERT(sizeof(float)    == 4, invalid_float_size);
+STATIC_ASSERT(sizeof(long)     == 8, invalid_long_size);
 STATIC_ASSERT(sizeof(double)   == 8, invalid_double_size);
 
 // These defines are for auto-completion of argues.
-#define CLIENT_PORT          8377 // Where our port will connect
-#define SERVER_PORT          8378 // Where other client will connect
 #define SERVER_MAXCLIENTS    10
 #define SERVER_MAXBUFSIZE    1024
 #define SERVER_MAXKEYSIZE    EVP_MAX_KEY_LENGTH + EVP_MAX_IV_LENGTH + 100
 #define RSA_SIZE             256  // Size of chunk in RSA. Data must be 256 - 11 size.
+#define ID_CLIENT_INVALID    0
 
 #ifdef _DEBUG
 #   define GULTRA_DEBUG         1    // Define this if you want every debug things.
@@ -196,6 +235,29 @@ GBEGIN_DECL
 typedef char          byte_t;
 typedef unsigned char ubyte_t;
 typedef unsigned char uchar_t;
+typedef uint64_t      netid__;
+typedef std::vector<std::string> stringlist_t;
+
+// As we want the same size_t type for every platform, we make it
+// always uint64_t. 
+#define size_t uint64_t
+
+// The netid_t is a type corresponding to the id
+// of a network. This id is computed from the creator
+// of the network, using is public key. This number
+// is guarenteed to be unique. You must know it to enter
+// the network.
+typedef union {
+    netid__  l;    // The long type.
+    ubyte_t  b[4]; // The bytes side.
+} netid_t;
+
+// stat_t corresponds to a status type. This status must be
+// a value from 0.00 to 1.00.
+// 0.00 corresponds to a new user, 1.00 to a master.
+// A master know every one in the network.
+// This value is computed using the algorithm num_of_master_accepted/num_of_master.
+typedef float stat_t;
 
 typedef enum GError
 {
@@ -227,13 +289,35 @@ typedef enum GError
     GERROR_BADCIPHER         = 25,
     GERROR_EVPBTKFAILURE     = 26,
     GERROR_TIMEDOUT          = 27,
+    GERROR_NET_NOTFOUND      = 28,
+    GERROR_NET_INVALID       = 29,
+    GERROR_NET_ALRINIT       = 30,
+    GERROR_NOTIMPLEMENTED    = 31,
+    GERROR_BADUSR            = 32,
+    GERROR_WSAVERSION        = 33,
+    GERROR_ALLOC             = 34,
+    GERROR_ANSWER_BAD        = 35,
+    GERROR_ANSWER_INVALID    = 36,
+    GERROR_DB_BADVERSION     = 37,
+    GERROR_DB_BADAUTOSAVE    = 38,
+    GERROR_ENCRYPT_NOSSL     = 39,
+    GERROR_ENCRYPT_PUBKEY    = 40,
+    GERROR_USR_NODBPASS      = 41,
+    GERROR_DB_BADHEADER      = 42,
+    GERROR_DB_BADDECRYPT     = 43,
+    GERROR_DB_FATALSTRUCT    = 44,
+    GERROR_NOUSER            = 45,
+    GERROR_NOUSERPASS        = 46,
+    GERROR_NORECEIVE         = 47,
+    GERROR_GCRYPT_BADPOS     = 48,
 
-    GERROR_MAX               = 28  // Number of errors
+    GERROR_MAX               = 49  // Number of errors
 } GError;
 typedef int gerror_t;
 
 // Return the error description for given error number
-const char* gerror_to_string(gerror_t& err);
+const char* gerror_to_string(GError err);
+const char* gerror_to_string(gerror_t err);
 
 // Timer for performance
 // Taken from http://stackoverflow.com/questions/6749621/high-resolution-timer-in-linux
@@ -277,5 +361,60 @@ extern pthread_mutex_t __console_mutex;
 GEND_DECL
 
 #include "serializer.h"
+
+GBEGIN_DECL
+
+// From http://oopweb.com/CPP/Documents/CPPHOWTO/Volume/C++Programming-HOWTO-7.html
+void Tokenize(const std::string& str, std::vector<std::string>& tokens, const std::string& delimiters = " ");
+
+// This part is to serialize and deserialize easily data from text and to text.
+// Data send using this method must be crypted to guarantee security because they are
+// human readable !!
+
+template <typename T>
+std::string to_text(const T& object) {
+    cout << "[Textizer] No implementation found for type '" << typeid(object).name() << "'." << endl;
+    return "";
+}
+
+template <typename T>
+T from_text(const std::string& object) {
+    cout << "[Textizer] No implementation found for type '" << typeid(object).name() << "'." << endl;
+    return T();
+}
+
+// Initialize network depending on platform. (Start WSA2.0)
+gerror_t NetworkInit();
+
+// A private customized recv() function.
+ssize_t grecv(int socket, void* buffer, size_t lenght, int flags);
+
+// A platform independent function to get a password from command prompt, but without showing it.
+// Modified from http://www.cplusplus.com/articles/E6vU7k9E/
+std::string getpass(bool show_asterisk = true);
+
+#include "structs.h"
+
+struct server_t;
+
+struct session_t
+{
+    database_t* database;
+    user_t*     user;
+    server_t*   server;
+    bool _treatingcommand;
+};
+
+extern session_t globalsession;
+
+// Macro _PANIC_ON_ERROR can be set by the user before compiling the Engine to make
+// an Engine really not tolerating any error.
+#ifndef _PANIC_ON_ERROR
+#define exit(a) return a
+#else
+#define exit(a) cout << "[Panic] Error : (" << __FUNCTION__ << ":" << __LINE__ << ") " << gerror_to_string(a) << endl; _exit(a)
+#endif
+
+GEND_DECL
 
 #endif // __PREREQUESITES__H

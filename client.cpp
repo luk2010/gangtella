@@ -27,6 +27,81 @@
 
 GBEGIN_DECL
 
+/** @brief [Internal] Allocates a new client with given id, mirror and server.
+ *
+ *  @param ret : [out] A pointer to a clientptr_t wich will contains the client
+ *  structure. The clientptr_t must be null.
+ *  @param id : the id that will be used in the client structure. It must be given
+ *  by the server (with a function like @ref server_generate_new_id() ) .
+ *  @param mirror : A clientptr_t wich points to an already initialized mirror pointer.
+ *  @param cserver : A pointer to the server creator. If null, the server specified will
+ *  be the default global one. 
+ *
+ *  @return 
+ *  - GERROR_NONE : Operation succeeded. 
+ *  - GERROR_BADARGS : The returned pointer is not null. 
+ *  - GERROR_ALLOC : Can't allocate the client structure.
+ *
+ *  @note This function is generally used internally by the server.
+**/
+gerror_t client_alloc (clientptr_t* ret, uint32_t id, clientptr_t mirror, void* cserver)
+{
+    if(*ret != nullptr)
+        return GERROR_BADARGS;
+    
+    clientptr_t client = new client_t;
+    if(!client)
+    {
+#ifdef GULTRA_DEBUG
+        cout << "[Client] Can't allocate new client structure." << endl;
+#endif
+        return GERROR_ALLOC;
+    }
+    
+    client->id      = id;
+    client->mirror  = mirror;
+    
+    if(!cserver)
+    {
+#ifdef GULTRA_DEBUG
+        cout << "[Client] Setting server to default one for client '" << id << "'." << endl;
+#endif
+        client->server = &server;
+    }
+    else
+    {
+        client->server = cserver;
+    }
+    
+    *ret = client;
+    return GERROR_NONE;
+}
+
+/** @brief Destroys the given client and free his memory.
+**/
+gerror_t client_free (clientptr_t* ret)
+{
+    if(*ret == nullptr)
+        return GERROR_BADARGS;
+    if((*ret)->server_thread.currope != CO_NONE || (*ret)->sock != INVALID_SOCKET)
+    {
+#ifdef GULTRA_DEBUG
+        cout << "[Client] Client(id=" << (*ret)->id << ") can't be freed as it is not stopped. Please "
+        << "call 'client_close(client)' before freeing the client structure." << endl;
+#endif
+        return GERROR_BADARGS;
+    }
+    
+    if((*ret)->mirror)
+    {
+        client_free(&(*ret)->mirror);
+    }
+    
+    delete *ret;
+    *ret = nullptr;
+    return GERROR_NONE;
+}
+
 /** @brief Create a Client from given information.
  *
  *  @param client : Pointer to a complete client structure. @note Only fields client_t::name
@@ -164,16 +239,16 @@ gerror_t client_send_cryptpacket(client_t* client, uint8_t packet_type, const vo
     info.ptype = packet_type;
 
     if(sz > 0) {
-        info.cryptedblock_number.data = (sz / (RSA_SIZE - 11) ) + 1;
-        info.cryptedblock_lastsz.data = sz % (RSA_SIZE - 11);
+        info.cryptedblock_number = (uint32_t) (sz / (RSA_SIZE - 11) ) + 1;
+        info.cryptedblock_lastsz = (uint32_t) sz % (RSA_SIZE - 11);
     }
     else {
-        info.cryptedblock_number.data = 0;
-        info.cryptedblock_lastsz.data = 0;
+        info.cryptedblock_number = 0;
+        info.cryptedblock_lastsz = 0;
     }
 
 #ifdef GULTRA_DEBUG
-    cout << "[Client] Sending CryptPacket Info (Block Num = " << info.cryptedblock_number.data << ", LBS = " << info.cryptedblock_lastsz.data << ")." << endl;
+    cout << "[Client] Sending CryptPacket Info (Block Num = " << info.cryptedblock_number << ", LBS = " << info.cryptedblock_lastsz << ")." << endl;
 #endif // GULTRA_DEBUG
 
     // We send the info to client
@@ -184,7 +259,7 @@ gerror_t client_send_cryptpacket(client_t* client, uint8_t packet_type, const vo
     if(err != GERROR_NONE)
         return err;
 
-    if(info.cryptedblock_number.data > 1)
+    if(info.cryptedblock_number > 1)
     {
         // We have to send many crypted chunk
         unsigned char* chunk   = reinterpret_cast<unsigned char*>(const_cast<void*>(data));
@@ -193,7 +268,7 @@ gerror_t client_send_cryptpacket(client_t* client, uint8_t packet_type, const vo
         memset(to, 0, RSA_SIZE);
 
         unsigned int i = 0;
-        for (; i < info.cryptedblock_number.data - 1; ++i)
+        for (; i < info.cryptedblock_number - 1; ++i)
         {
             current = chunk + ( i * ( RSA_SIZE - 11 ) );
             int len = Encryption::crypt(server->crypt, to, current, RSA_SIZE - 11);
@@ -206,7 +281,7 @@ gerror_t client_send_cryptpacket(client_t* client, uint8_t packet_type, const vo
         }
 
         current = chunk + ( i * ( RSA_SIZE - 11 ) );
-        int len = Encryption::crypt(server->crypt, to, current, info.cryptedblock_lastsz.data);
+        int len = Encryption::crypt(server->crypt, to, current, info.cryptedblock_lastsz);
 
 #ifdef GULTRA_DEBUG
         cout << "[Client] Sending len = " << len << "bytes." << endl;
@@ -223,7 +298,7 @@ gerror_t client_send_cryptpacket(client_t* client, uint8_t packet_type, const vo
 
         return GERROR_NONE;
     }
-    else if(info.cryptedblock_number.data == 1)
+    else if(info.cryptedblock_number == 1)
     {
         // We have to send one crypted chunk
         unsigned char* chunk = reinterpret_cast<unsigned char*>(const_cast<void*>(data));
@@ -281,7 +356,7 @@ gerror_t client_send_file(client_t* client, const char* filename)
             // On peut envoyer le fichier d'un seul block
             struct send_file_t sft;
             sft.has_chunk   = false;
-            sft.lenght.data = lenght;
+            sft.lenght = lenght;
 
             const size_t flenght = strlen(filename);
             memcpy(sft.name, filename, flenght);
@@ -364,11 +439,11 @@ gerror_t client_send_file(client_t* client, const char* filename)
         {
             // Il va falloir envoyer le fichier en plusiers chunk
             struct send_file_t sft;
-            sft.has_chunk           = true;
-            sft.lenght.data         = lenght;
-            sft.chunk_lenght.data   = SERVER_MAXBUFSIZE;
-            sft.chunk_lastsize.data = lenght % SERVER_MAXBUFSIZE;
-            sft.chunk_count.data    = ((int) lenght/SERVER_MAXBUFSIZE) + 1;
+            sft.has_chunk      = true;
+            sft.lenght         = lenght;
+            sft.chunk_lenght   = SERVER_MAXBUFSIZE;
+            sft.chunk_lastsize = lenght % SERVER_MAXBUFSIZE;
+            sft.chunk_count    = ((int) lenght/SERVER_MAXBUFSIZE) + 1;
 
             const size_t flenght  = strlen(filename);
             memcpy(sft.name, filename, flenght);
@@ -377,9 +452,9 @@ gerror_t client_send_file(client_t* client, const char* filename)
 #ifdef GULTRA_DEBUG
             cout << "[Client] Info : " << endl;
             cout << "[Client] lenght          = " << lenght << "." << endl;
-            cout << "[Client] Chunk count     = " << sft.chunk_count.data << "." << endl;
-            cout << "[Client] Chunk lenght    = " << sft.chunk_lenght.data << "." << endl;
-            cout << "[Client] Chunk last size = " << sft.chunk_lastsize.data << "." << endl;
+            cout << "[Client] Chunk count     = " << sft.chunk_count << "." << endl;
+            cout << "[Client] Chunk lenght    = " << sft.chunk_lenght << "." << endl;
+            cout << "[Client] Chunk last size = " << sft.chunk_lastsize << "." << endl;
 #endif // GULTRA_DEBUG
 
             sft = serialize<send_file_t>(sft);
@@ -394,16 +469,16 @@ gerror_t client_send_file(client_t* client, const char* filename)
             sft = deserialize<send_file_t>(sft);
 
             uint32_t chunks = 0;
-            size_t len      = sft.chunk_lenght.data;
+            size_t len      = sft.chunk_lenght;
             char buffer[len];
 
             size_t len_send = 0;
             if(server->bs_callback)
                 server->bs_callback(sft.name, len_send, lenght);
 
-            while(chunks < sft.chunk_count.data - 1)
+            while(chunks < sft.chunk_count - 1)
             {
-                is.read(buffer, sft.chunk_lenght.data);
+                is.read(buffer, sft.chunk_lenght);
                 if(!is)
                 {
                     cout << "[Client] Error : Can't terminate file reading.";
@@ -418,10 +493,10 @@ gerror_t client_send_file(client_t* client, const char* filename)
                 }
 
 #ifdef GULTRA_DEBUG
-                cout << "[Client] Sending chunk (size : " << sft.chunk_lenght.data << ", # = " << chunks << ")." << endl;
+                cout << "[Client] Sending chunk (size : " << sft.chunk_lenght << ", # = " << chunks << ")." << endl;
 #endif // GULTRA_DEBUG
 
-                if(server->client_send(client, PT_CLIENT_SENDFILE_CHUNK, buffer, sft.chunk_lenght.data) != GERROR_NONE)
+                if(server->client_send(client, PT_CLIENT_SENDFILE_CHUNK, buffer, sft.chunk_lenght) != GERROR_NONE)
                 {
                     cout << "[Client] Error sending chunk packet !" << endl;
                     is.close();
@@ -435,7 +510,7 @@ gerror_t client_send_file(client_t* client, const char* filename)
             }
 
             memset((void*) buffer, 0, len);
-            is.read(buffer, sft.chunk_lastsize.data);
+            is.read(buffer, sft.chunk_lastsize);
             if(!is)
             {
                 cout << "[Client] Error : Can't terminate file reading.";
@@ -452,16 +527,16 @@ gerror_t client_send_file(client_t* client, const char* filename)
             is.close();
 
 #ifdef GULTRA_DEBUG
-            cout << "[Client] Sending chunk (size : " << sft.chunk_lastsize.data << ", # = " << chunks << ")." << endl;
+            cout << "[Client] Sending chunk (size : " << sft.chunk_lastsize << ", # = " << chunks << ")." << endl;
 #endif // GULTRA_DEBUG
 
-            if(server->client_send(client, PT_CLIENT_SENDFILE_CHUNK, buffer, sft.chunk_lenght.data) != GERROR_NONE)
+            if(server->client_send(client, PT_CLIENT_SENDFILE_CHUNK, buffer, sft.chunk_lenght) != GERROR_NONE)
             {
                 cout << "[Client] Error sending chunk packet !" << endl;
                 return GERROR_CANT_SEND_PACKET;
             }
 
-            len_send += sft.chunk_lenght.data;
+            len_send += sft.chunk_lenght;
 
             if(server->bs_callback)
                 server->bs_callback(sft.name, len_send, lenght);
@@ -489,6 +564,14 @@ gerror_t client_send_file(client_t* client, const char* filename)
         cout << "[Client] Error : Can't open file '" << filename << "'.";
         return GERROR_CANTOPENFILE;
     }
+}
+
+gerror_t client_thread_setstatus(clientptr_t client, ClientOperation ope)
+{
+    gthread_mutex_lock(&client->server_thread.mutexaccess);
+    client->server_thread.currope = ope;
+    gthread_mutex_unlock(&client->server_thread.mutexaccess);
+    return GERROR_NONE;
 }
 
 GEND_DECL

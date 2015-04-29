@@ -25,43 +25,17 @@
 #define __USER_H__
 
 #include "prerequesites.h"
+#include "database.h"
 
 GBEGIN_DECL
 
-/** @brief This struct represents a user in user-space of GangTella
- *  network.
-**/
-typedef struct {
-	std::string name; // User name
-	std::string key;  // User key
-	std::string iv;   // User iv
-	
-} user_t;
+gerror_t user_create				 (userptr_t* user, const std::string& uname, const std::string& upass);
+gerror_t user_destroy				 (user_t* user);
 
-typedef struct {
-	std::string ip;
-	std::string port;
-} dbclient_t;
-
-typedef struct {
-	std::string                   dbname;   // Database name.
-	std::string                   dbfile;   // Database file.
-	bool                          autosave; // True if database is saved when destroyed or reloaded.
-	std::map<std::string, user_t> users;    // Users in the database, with their user_t struct.
-	std::vector<dbclient_t>       clients;  // Clients successfully connected to this server.
-	
-} user_db_t;
-
-extern user_db_t* udatabase;
-
-gerror_t user_create				 (user_t& user, const std::string& uname, const std::string& upass);
-gerror_t user_destroy				 (user_t& user);
-gerror_t user_database_load			 (const std::string& dbname);
-gerror_t user_database_export	 	 (const std::string& dbname);
-gerror_t user_database_destroy		 ();
-bool     user_database_isloaded		 ();
-bool     user_is_loaded         	 (const std::string& name);
-bool     user_database_clientisloaded(const dbclient_t& client);
+// new API
+gerror_t user_register_client       (user_t* usr, const database_clientinfo_t& client);
+bool     user_has_accepted          (user_t* usr, const char* username);
+database_accepted_user_t* user_find_accepted (user_t* usr, const char* username);
 
 GEND_DECL
 

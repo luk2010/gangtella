@@ -36,6 +36,7 @@ enum ClientOperation
 {
     CO_IDLING,           // Client is waiting for a packet.
     CO_PROCESSINGPACKET, // Client is processing a packet.
+    CO_ESTABLISHING,     // Client has not yet established complete connection.
     
     CO_NONE              // Client is doing nothing. (Probably stopped or not started yet.)
 };

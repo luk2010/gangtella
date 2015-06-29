@@ -5,7 +5,7 @@
 
 /*
     GangTella Project
-    Copyright (C) 2014  Luk2010
+    Copyright (C) 2014 - 2015  Luk2010
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -74,9 +74,9 @@
 #define _PANIC_ON_ERROR
 
 #ifdef _DEBUG
-#define GVERSION_BUILD "11d"
+#define GVERSION_BUILD "13d"
 #else
-#define GVERSION_BUILD "11"
+#define GVERSION_BUILD "13"
 #endif // _DEBUG
 
 #define GANGTELLA_VERSION GVERSION_MAJ "." GVERSION_MIN "." GVERSION_BUILD
@@ -310,8 +310,9 @@ typedef enum GError
     GERROR_NOUSERPASS        = 46,
     GERROR_NORECEIVE         = 47,
     GERROR_GCRYPT_BADPOS     = 48,
+    GERROR_DB_NOUSER         = 49,
 
-    GERROR_MAX               = 49  // Number of errors
+    GERROR_MAX               = 50  // Number of errors
 } GError;
 typedef int gerror_t;
 
@@ -345,6 +346,21 @@ typedef struct {
     unsigned char   buf[SERVER_MAXBUFSIZE];
     size_t size;
 } buffer_t;
+
+// A static buffer.
+// Lenght can't be superior to UINT16_MAX, this buffer
+// should always be used for network.
+// Buffer is always lenght+1 of size, because it always terminate with '\0'
+// by convention, to allow automatic string conversion.
+typedef struct netbuffer_t {
+    char*    buf;   // Contains the data.
+    uint16_t lenght;// Contains the lenght of the data.
+    
+    netbuffer_t() {
+        buf = nullptr;
+        lenght = 0;
+    }
+} netbuffer_t;
 
 gerror_t buffer_copy(buffer_t& dest, const buffer_t& src);
 
@@ -393,6 +409,20 @@ ssize_t grecv(int socket, void* buffer, size_t lenght, int flags);
 // Modified from http://www.cplusplus.com/articles/E6vU7k9E/
 std::string getpass(bool show_asterisk = true);
 
+// Copy a string buffer with its lenght (uint16 version)
+void strbufcreateandcopy(char*& outstr, uint16_t& outlen, const char* in, uint16_t inlen);
+
+// Create an empty netbuffer
+netbuffer_t* netbuf_new(uint16_t lenght);
+netbuffer_t* netbuf_new(const char* data, uint16_t lenght);
+// Copy and create new buffer.
+netbuffer_t* netbuf_copy(const netbuffer_t& other);
+// Copy from raw data.
+void netbuf_copyraw(netbuffer_t* to, const char* from, uint16_t lenght);
+// Free the buffer and reset it.
+void netbuf_delete(netbuffer_t* buf);
+void netbuf_free(netbuffer_t*& buf);// Also nullize the buffer.
+
 #include "structs.h"
 
 struct server_t;
@@ -414,6 +444,21 @@ extern session_t globalsession;
 #else
 #define exit(a) cout << "[Panic] Error : (" << __FUNCTION__ << ":" << __LINE__ << ") " << gerror_to_string(a) << endl; _exit(a)
 #endif
+
+// gnotifiate subsystem - 28/06/2015
+
+/** @brief Notifiate printf-like style some informations depending on the log 
+ *  level. You also can set different streams using gnotifiate_setloglevelfile().
+**/
+void gnotifiate(int level, const char* format, ...);
+
+#define gnotifiate_error(fmt, ...) gnotifiate (1, fmt, ##__VA_ARGS__ )
+#define gnotifiate_warn(fmt, ...) gnotifiate (2, fmt, ##__VA_ARGS__ )
+#define gnotifiate_info(fmt, ...) gnotifiate (3, fmt, ##__VA_ARGS__ )
+
+/** @brief Set the default logging files for given level.
+**/
+void gnotifiate_setloglevelfile(int level, FILE* file);
 
 GEND_DECL
 

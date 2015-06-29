@@ -319,7 +319,7 @@ gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size
 gerror_t packet_get_buffer(Packet* p, unsigned char*& buf, size_t& sz);
 
 gerror_t packet_wait          (SOCKET sock, PacketPtr& retpacket);
-Packet*  receive_client_packet(SOCKET sock);
+Packet*  receive_client_packet(SOCKET sock, bool timedout = true, uint32_t sec = 3);
 gerror_t send_client_packet   (SOCKET sock, uint8_t packet_type, const void* data, size_t sz);
 
 GEND_DECL

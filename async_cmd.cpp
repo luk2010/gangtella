@@ -102,12 +102,12 @@ gerror_t async_cmd_userinit(std::vector<std::string> args, server_t* server)
 	{
 		std::string ipclient   = args[1];
 		std::string portclient = args[2];
-		cout << "[Command] Initializing connection with identity '" << globalsession.user->name << "' to client '" << ipclient
+		cout << "[Command] Initializing connection with identity '" << globalsession.user->m_name->buf << "' to client '" << ipclient
 			 << ":" << portclient << "'." << endl;
 				
 		if(server_init_user_connection(server, ipclient.c_str(), atoi(portclient.c_str())) == GERROR_NONE)
 		{
-			cout << "[Command] User connected to '" << globalsession.user->name << "'." << endl;
+			cout << "[Command] User connected to '" << globalsession.user->m_name->buf << "'." << endl;
 		}
 		else
 		{

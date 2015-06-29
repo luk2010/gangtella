@@ -9,6 +9,10 @@ GBEGIN_DECL
 pthread_mutex_t __console_mutex = PTHREAD_MUTEX_INITIALIZER;
 session_t globalsession;
 
+FILE* _fileInfo = NULL;
+FILE* _fileWarn = NULL;
+FILE* _fileError = NULL;
+
 #ifdef _WIN32
 
 LARGE_INTEGER
@@ -222,7 +226,8 @@ static const char* __errors [GERROR_MAX] = {
     "No user provided.",
     "No user password provided.",
     "No packets have been received.",
-    "(GCrypt) Bad Position token in file."
+    "(GCrypt) Bad Position token in file.",
+    "No BT_USER block before BT_CLIENT block."
 };
 
 const char* gerror_to_string(GError err)
@@ -442,5 +447,175 @@ std::string getpass(bool show_asterisk)
 #endif
 }
 
+void strbufcreateandcopy(char*& outstr, uint16_t& outlen, const char* in, uint16_t inlen)
+{
+    outstr = (char*) malloc(inlen+1);
+    outlen = inlen;
+    memcpy(outstr, in, inlen);
+    outstr[inlen] = '\0';
+}
+
+netbuffer_t* netbuf_new(uint16_t lenght)
+{
+    netbuffer_t* ret = (netbuffer_t*) malloc(sizeof(netbuffer_t));
+    
+    if(!ret) {
+#ifdef GULTRA_DEBUG
+        cout << "[netbuf] Can't allocate netbuffer structure." << endl;
+        exit(GERROR_ALLOC);
+#endif
+        
+        return ret;
+    }
+    
+    ret->lenght = 0;
+    
+    if(lenght > 0)
+    {
+        ret->buf    = (char*) malloc(lenght + 1);
+        
+        if(!ret->buf) {
+#ifdef GULTRA_DEBUG
+            cout << "[netbuf] Can't allocate netbuffer data." << endl;
+            exit(GERROR_ALLOC);
+#endif
+            return ret;
+        }
+        
+        ret->buf[lenght] = '\0';
+        ret->lenght      = lenght;
+    }
+    else
+    {
+        ret->buf = nullptr;
+    }
+    
+    return ret;
+}
+
+netbuffer_t* netbuf_copy(const netbuffer_t& other)
+{
+    netbuffer_t* ret = (netbuffer_t*) malloc(sizeof(netbuffer_t));
+    
+    if(!ret) {
+#ifdef GULTRA_DEBUG
+        cout << "[netbuf] Can't allocate netbuffer structure." << endl;
+        exit(GERROR_ALLOC);
+#endif
+        
+        return ret;
+    }
+    
+    ret->lenght = 0;
+    
+    if(other.lenght > 0)
+    {
+        ret->buf    = (char*) malloc(other.lenght + 1);
+        
+        if(!ret->buf) {
+#ifdef GULTRA_DEBUG
+            cout << "[netbuf] Can't allocate netbuffer data." << endl;
+            exit(GERROR_ALLOC);
+#endif
+            return ret;
+        }
+        
+        memcpy(ret->buf, other.buf, other.lenght);
+        ret->buf[other.lenght] = '\0';
+        ret->lenght            = other.lenght;
+    }
+    else
+    {
+        ret->buf = nullptr;
+    }
+    
+    return ret;
+}
+
+void netbuf_copyraw(netbuffer_t* to, const char* from, uint16_t lenght)
+{
+    if(to->lenght > 0 || to->buf != nullptr) {
+#ifdef GULTRA_DEBUG
+        cout << "[netbuf] netbuffer structure not empty, so deleting it." << endl;
+#endif
+        netbuf_delete(to);
+    }
+    
+    if(from && lenght > 0)
+    {
+        to->buf = (char*) malloc(lenght);
+        if(!to->buf) {
+#ifdef GULTRA_DEBUG
+            cout << "[netbuf] Can't allocate netbuffer data." << endl;
+            exit(GERROR_ALLOC);
+#endif
+            return;
+        }
+        
+        memcpy(to->buf, from, lenght);
+        to->buf[lenght] = '\0';
+        to->lenght      = lenght;
+    }
+    else
+    {
+        to->lenght = 0;
+        to->buf    = nullptr;
+    }
+}
+
+void netbuf_delete(netbuffer_t* buf)
+{
+    if(buf->lenght > 0)
+    {
+        free(buf->buf);
+    }
+    
+    buf->lenght = 0;
+    buf->buf    = nullptr;
+}
+
+void netbuf_free(netbuffer_t*& buf)
+{
+    netbuf_delete(buf);
+    free(buf);
+    buf = nullptr;
+}
+
+netbuffer_t* netbuf_new(const char* data, uint16_t lenght)
+{
+    netbuffer_t* ret = netbuf_new(0);
+    if(ret)
+        netbuf_copyraw(ret, data, lenght);
+    return ret;
+}
+
+void gnotifiate (int level, const char* format, ...)
+{
+    if(!_fileInfo || !_fileWarn || !_fileError) {
+        _fileInfo = _fileWarn = _fileError = stdout;
+    }
+    
+    va_list args;
+    FILE* log_file = level == 0 ? _fileError : level == 1 ? _fileWarn : _fileInfo;
+    
+    va_start(args, format);
+    vfprintf(log_file, format, args);
+    va_end(args);
+    
+#if GULTRA_DEBUG
+    fflush(log_file);
+    fsync(fileno(log_file));
+#endif
+}
+
+void gnotifiate_setloglevelfile(int level, FILE* file)
+{
+    if(level == 0)
+        _fileError = file;
+    else if(level == 1)
+        _fileWarn = file;
+    else
+        _fileInfo = file;
+}
 
 GEND_DECL

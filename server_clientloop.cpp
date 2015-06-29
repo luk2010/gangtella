@@ -101,24 +101,12 @@ void* server_client_thread_loop(void* data)
             client->established = true;
             delete pclient;
             
-            // As client is valid, we can save it to the database.
-            /*
-             if(user_database_isloaded())
-             {
-             dbclient_t dbc;
-             dbc.ip   = std::string(inet_ntoa(client->address.sin_addr));
-             dbc.port = std::to_string(ntohs(client->mirror->address.sin_port));
-             
-             if(!user_database_clientisloaded(dbc))
-             udatabase->clients.push_back(dbc);
-             }
-             */
             // We directly register the client to the user in the session. The user will be saved
             // when terminating the session.
             
             database_clientinfo_t dbclient;
             dbclient.ip   = std::string(inet_ntoa(client->address.sin_addr));
-            dbclient.port = std::to_string(ntohs(client->mirror->address.sin_port));
+            dbclient.port = (uint16_t) ntohs(client->mirror->address.sin_port);
             
             user_register_client(globalsession.user, dbclient);
         }
@@ -172,14 +160,19 @@ void* server_client_thread_loop(void* data)
                         
                         // User is already accepted, so register it normally.
                         user_init_t uinit;
-                        strcpy(uinit.name, globalsession.user->name);
-                        strcpy(uinit.key,  globalsession.user->key);
-                        strcpy(uinit.iv,   globalsession.user->iv);
+                        strcpy(uinit.name, globalsession.user->m_name->buf);
+                        strcpy(uinit.key,  globalsession.user->m_key->buf);
+                        strcpy(uinit.iv,   globalsession.user->m_iv->buf);
                         org->client_send(client->mirror, PT_USER_INIT_RESPONSE, &uinit, sizeof(uinit));
                         
-                        strcpy(client->logged_user->name, uip->data.name);
-                        strcpy(client->logged_user->key, uip->data.key);
-                        strcpy(client->logged_user->iv, uip->data.iv);
+                        /*strcpy(client->logged_user->m_name->buf, uip->data.name);
+                        strcpy(client->logged_user->m_key->buf, uip->data.key);
+                        strcpy(client->logged_user->m_iv->buf, uip->data.iv);*/
+                        netbuf_copyraw(client->logged_user->m_name, uip->data.name, strlen(uip->data.name));
+                        netbuf_copyraw(client->logged_user->m_key, uip->data.key, strlen(uip->data.key));
+                        netbuf_copyraw(client->logged_user->m_iv, uip->data.iv, strlen(uip->data.iv));
+                        
+                        
                         client->logged            = true;
                         
                         cout << "[Server]{" << client->name << "} User '" << uip->data.name << "' accepted." << endl;
@@ -189,7 +182,7 @@ void* server_client_thread_loop(void* data)
                 
                 else
                 {
-                    cout << "[Server]{" << client->name << "} Do you accept user '" << uip->data.name << "' ? (Y/N)" << endl;
+                    cout << "[Server]{" << client->name << "} Do you accept user '" << uip->data.name << "' ? [Y/n]" << endl;
                     
                     // If this server is logged in, we will ask for the user if we should accept this userinit command.
                     std::string lastcmd;
@@ -197,7 +190,7 @@ void* server_client_thread_loop(void* data)
                     console_waitfor_command();
                     lastcmd = console_get_lastcommand();
                     
-                    if(lastcmd == "Y")
+                    if(lastcmd != "n" || lastcmd != "N")
                     {
                         // If we accept the user, we save it to database.
 #ifndef GULTRA_DEBUG
@@ -205,15 +198,23 @@ void* server_client_thread_loop(void* data)
 #endif // GULTRA_DEBUG
                         
                         user_init_t uinit;
-                        strcpy(uinit.name, globalsession.user->name);
-                        strcpy(uinit.key,  globalsession.user->key);
-                        strcpy(uinit.iv,   globalsession.user->iv);
+                        strcpy(uinit.name, globalsession.user->m_name->buf);
+                        strcpy(uinit.key,  globalsession.user->m_key->buf);
+                        strcpy(uinit.iv,   globalsession.user->m_iv->buf);
                         org->client_send(client->mirror, PT_USER_INIT_RESPONSE, &uinit, sizeof(uinit));
                         
-                        strcpy(client->logged_user->name, uip->data.name);
-                        strcpy(client->logged_user->key, uip->data.key);
-                        strcpy(client->logged_user->iv, uip->data.iv);
-                        client->logged           = true;
+                        /* strbufcreateandcopy(client->logged_user->name, client->logged_user->lname,
+                                            uip->data.name, strlen(uip->data.name));
+                        strbufcreateandcopy(client->logged_user->key, client->logged_user->lkey,
+                                            uip->data.key, strlen(uip->data.key));
+                        strbufcreateandcopy(client->logged_user->iv, client->logged_user->liv,
+                                            uip->data.iv, strlen(uip->data.iv)); */
+                        
+                        netbuf_copyraw(client->logged_user->m_name, uip->data.name, strlen(uip->data.name));
+                        netbuf_copyraw(client->logged_user->m_key, uip->data.key, strlen(uip->data.key));
+                        netbuf_copyraw(client->logged_user->m_iv, uip->data.name, strlen(uip->data.iv));
+                        
+                        client->logged = true;
                         
                         cout << "[Server]{" << client->name << "} User '" << uip->data.name << "' accepted." << endl;
                     }
@@ -289,13 +290,13 @@ void* server_client_thread_loop(void* data)
         
         else if(pclient->m_type == PT_USER_INIT_AEXIST)
         {
-            cout << "[Server]{" << client->name << "} User '" << globalsession.user->name << "' already exists in client database." << endl;
+            cout << "[Server]{" << client->name << "} User '" << globalsession.user->m_name->buf << "' already exists in client database." << endl;
             delete pclient;
         }
         
         else if(pclient->m_type == PT_USER_END)
         {
-            cout << "[Server]{" << client->name << "} Unlogging request from user '" << client->logged_user->name << "'." << endl;
+            cout << "[Server]{" << client->name << "} Unlogging request from user '" << client->logged_user->m_name->buf << "'." << endl;
             
             user_destroy(client->logged_user);
             client->logged = false;
@@ -307,7 +308,7 @@ void* server_client_thread_loop(void* data)
         
         else if(pclient->m_type == PT_USER_END_RESPONSE)
         {
-            cout << "[Server]{" << client->name << "} Unlogging from user '" << client->logged_user->name << "'." << endl;
+            cout << "[Server]{" << client->name << "} Unlogging from user '" << client->logged_user->m_name->buf << "'." << endl;
             
             user_destroy(client->logged_user);
             client->logged = false;

@@ -72,7 +72,7 @@ template <> dbclientlist_t from_text(const std::string& clist)
                 {
                     i = 2 * j + 2;
                     dbclientptr_t more = new dbclient_t;
-                    more->port = tokens[i];
+                    more->port = atoi(tokens[i].c_str());
                     more->ip   = tokens[i+1];
                     ret.push_back(more);
                 }
@@ -149,7 +149,7 @@ gerror_t user_create(userptr_t* user, const std::string& uname, const std::strin
 	}
 	
 	// We found user in database, so check password.
-	if(Encryption::user_check_password(ret->key, ret->iv, upass.c_str(), upass.size()))
+	if(Encryption::user_check_password(ret->m_key->buf, ret->m_iv->buf, upass.c_str(), upass.size()))
 	{
         // Return the user if possible
         if(*user)
@@ -176,9 +176,14 @@ gerror_t user_create(userptr_t* user, const std::string& uname, const std::strin
 **/
 gerror_t user_destroy(user_t* user)
 {
+    /*
     free(user->name);
     free(user->key);
     free(user->iv);
+     */
+    netbuf_free(user->m_name);
+    netbuf_free(user->m_key);
+    netbuf_free(user->m_iv);
 	
 	// Everything went okay
 	return GERROR_NONE;

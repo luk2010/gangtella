@@ -27,6 +27,7 @@
 #include "client.h"
 #include "server.h"
 #include "database.h"
+#include "serverlistener.h"
 
 using namespace Gangtella;
 
@@ -43,6 +44,8 @@ void treat_command(const std::string& command)
         args.push_back(tok);
         tok = strtok(NULL, " ");
     }
+    
+    bool cancel_command = false;
 
     if(!args.empty())
     {
@@ -140,7 +143,15 @@ void treat_command(const std::string& command)
         {
             async_command_launch(CMD_VERSION, args, globalsession.server);
         }
+        
+        else
+        {
+            cancel_command = true;
+        }
     }
+    
+    if(cancel_command == true)
+        globalsession._treatingcommand = false;
 
     console_last_command = command;
 }
@@ -212,6 +223,20 @@ void display_user_help()
 		 << "User connection : You need a password and a username. Then, it will connect to the nearest " << endl; cout
 		 << "trusted server wich will approve (if it knows you) or disapprove you to enter the network." << endl;
 }
+
+class TestServerListener : public ServerListener
+{
+public:
+    
+    ~TestServerListener() { }
+    
+    void onServerStarted(const ServerStartedEvent* e) {
+        gnotifiate_info("[TestServerListener] Server started !");
+    }
+    void onServerStopped(const ServerStoppedEvent* e) {
+        gnotifiate_info("[TestServerListener] Server stopped !");
+    }
+};
 
 int main(int argc, char* argv[])
 {
@@ -293,6 +318,10 @@ int main(int argc, char* argv[])
             i++;
         }
     }
+    
+    // Register our listener.
+    TestServerListener* tsl = new TestServerListener;
+    server.addListener(tsl);
 
     // Initialize encryption unit.
 
@@ -363,9 +392,9 @@ int main(int argc, char* argv[])
 
     // Now check the user input.
 
-    user_t* user = (user_t*) malloc(sizeof(user_t));
-    user->lkey = 0;
-    user->liv = 0;
+    user_t* user = new user_t();
+    //user->lkey = 0;
+    //user->liv = 0;
 
     if(username.empty())
     {
@@ -438,8 +467,8 @@ int main(int argc, char* argv[])
         ncuserpass = ncpass;
     }
 
-    std::string tmp1(user->key);
-    std::string tmp2(user->iv);
+    std::string tmp1(user->m_key->buf);
+    std::string tmp2(user->m_iv->buf);
 
     if(!Encryption::user_check_password(tmp1, tmp2, ncuserpass.c_str(), ncuserpass.size())) {
         cout << "[Main] Wrong password. Exiting." << endl;
@@ -510,7 +539,7 @@ int main(int argc, char* argv[])
     while(1)
     {
         char buf[server.args.maxbufsize];
-        cout << "@" << (const char*) globalsession.user->name << ":> "; gthread_mutex_unlock(&__console_mutex);
+        cout << "@" << (const char*) globalsession.user->m_name->buf << ":> "; gthread_mutex_unlock(&__console_mutex);
         std::cin.getline(buf, server.args.maxbufsize - 1);
         tmp = buf;
         if(tmp == "exit")
@@ -522,13 +551,18 @@ int main(int argc, char* argv[])
         }
         else
         {
+            globalsession._treatingcommand = true;
             treat_command(tmp);
             while(globalsession._treatingcommand);
         }
     }
     
-    cout << "[Main] Saving database '" << globalsession.database->name << "'." << endl;
+    cout << "[Main] Saving database '" << globalsession.database->m_name->buf << "'." << endl;
     database_save(globalsession.database);
+    
+    // Cleaning our listener
+    server.removeListener(tsl);
+    delete tsl;
 
     cout << "[Main] Goodbye." << endl;
     return 0;

@@ -1,25 +1,22 @@
-/*
-    File : server.cpp
-    Description : Implements server functions.
-*/
-
-/*
-    GangTella Project
-    Copyright (C) 2014  Luk2010
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+////////////////////////////////////////////////////////////
+//
+// GangTella - A multithreaded crypted server.
+// Copyright (c) 2014 - 2015 Luk2010 (alain.ratatouille@gmail.com)
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+////////////////////////////////////////////////////////////
 
 #include "prerequesites.h"
 #include "server.h"
@@ -36,6 +33,7 @@ server_t server;
 
 void* server_thread_loop (void*);
 
+////////////////////////////////////////////////////////////
 /** @brief Initialize the default parameters of the server_t structure.
  *
  *  It realize the different task :
@@ -47,6 +45,7 @@ void* server_thread_loop (void*);
  *  @return
  *  - GERROR_NONE on success.
 **/
+////////////////////////////////////////////////////////////
 gerror_t server_create()
 {
 
@@ -137,6 +136,7 @@ gerror_t server_create()
     return GERROR_NONE;
 }
 
+////////////////////////////////////////////////////////////
 /** @brief Initialize a new server structure.
  *  @note This function assumes server is not null, and mutex and started
  *  are already initialized.
@@ -150,6 +150,7 @@ gerror_t server_create()
  *  On Windows :
  *  - GERROR_WSASTARTUP if WSA can't be started.
 **/
+////////////////////////////////////////////////////////////
 gerror_t server_initialize()
 {
     gthread_mutex_lock(&server.mutex);
@@ -222,6 +223,7 @@ gerror_t server_initialize()
     return GERROR_NONE;
 }
 
+////////////////////////////////////////////////////////////
 /** @brief Launch the Server thread.
  *
  *  @param server : A pointer to the server structure.
@@ -231,6 +233,7 @@ gerror_t server_initialize()
  *  - GERROR_BADARGS if server is null.
  *  - GERROR_THREAD_CREATION if thread cannot be created.
 **/
+////////////////////////////////////////////////////////////
 gerror_t server_launch(server_t* server)
 {
     if(!server)
@@ -247,6 +250,7 @@ gerror_t server_launch(server_t* server)
         return GERROR_NONE;
 }
 
+////////////////////////////////////////////////////////////
 /** @brief Destroys this server and all his client connection.
  *
  *  @param server : A pointer to the server structure.
@@ -258,6 +262,7 @@ gerror_t server_launch(server_t* server)
  *  - GERROR_MUTEX_UNLOCK if mutex can't be unlocked.
  *  - GERROR_WSACLEANING if WSA can't be cleaned.
 **/
+////////////////////////////////////////////////////////////
 gerror_t server_destroy(server_t* server)
 {
     if(!server)
@@ -349,6 +354,24 @@ gerror_t server_destroy(server_t* server)
     return err;
 }
 
+////////////////////////////////////////////////////////////
+/** @brief Set the new SendPolicy of the given server.
+ *
+ *  @param server : The server to change the send policy.
+ *  @param policy : The new policy to adopt. This policy
+ *  can be \c SP_NORMAL or \c SP_CRYPTED. We hightly 
+ *  recommend the use of \c SP_NORMAL. 
+ *
+ *  @note
+ *  Changing this value when the server already has clients
+ *  connected has undefined behaviour.
+ *
+ *  @return 
+ *  - GERROR_NONE on success.
+ *  - GERROR_BADARGS if server is null, or if the policy is
+ *    invalid.
+**/
+////////////////////////////////////////////////////////////
 gerror_t server_setsendpolicy(server_t* server, int policy)
 {
     if(policy > SP_CRYPTED || policy < SP_NORMAL || !server)
@@ -362,6 +385,23 @@ gerror_t server_setsendpolicy(server_t* server, int policy)
     return GERROR_NONE;
 }
 
+////////////////////////////////////////////////////////////
+/** @brief Set the callback when the server receives bytes, 
+ *  generally used when receiving a file.
+ *
+ *  @param server : The server to change the callback. 
+ *  @param callback : The callback to use.
+ *
+ *  You can use the callback to provide custom handling of the
+ *  received amount of data when receiving files, like drawing
+ *  a waiting bar.
+ *
+ *  @return 
+ *  - GERROR_NONE on success.
+ *  - GERROR_BADARGS if server is null.
+ *
+**/
+////////////////////////////////////////////////////////////
 gerror_t server_setbytesreceivedcallback(server_t* server, bytesreceived_t callback)
 {
     if(!server)
@@ -370,6 +410,23 @@ gerror_t server_setbytesreceivedcallback(server_t* server, bytesreceived_t callb
     return GERROR_NONE;
 }
 
+////////////////////////////////////////////////////////////
+/** @brief Set the callback when the server send bytes,
+ *  generally used when sending a file.
+ *
+ *  @param server : The server to change the callback.
+ *  @param callback : The callback to use.
+ *
+ *  You can use the callback to provide custom handling of the
+ *  sent amount of data when sending files, like drawing
+ *  a waiting bar.
+ *
+ *  @return
+ *  - GERROR_NONE on success.
+ *  - GERROR_BADARGS if server is null.
+ *
+ **/
+////////////////////////////////////////////////////////////
 gerror_t server_setbytessendcallback(server_t* server, bytessend_t callback)
 {
     if(!server)
@@ -378,18 +435,25 @@ gerror_t server_setbytessendcallback(server_t* server, bytessend_t callback)
     return GERROR_NONE;
 }
 
-/** @brief Receive a packet from given client and decrypt it if encrypted.
+////////////////////////////////////////////////////////////
+/** @brief Receive a packet from given client and decrypt it 
+ *  if encrypted.
  *
- *  @note This is a timed out version of server_wait_packet().
+ *  @note 
+ *  This is a timed out version of server_wait_packet(). This 
+ *  means that after a certain time, the function will return 
+ *  as an error.
  *
  *  @param server : Pointer to the server_t object.
  *  @param client : Pointer to the client_t object.
  *
  *  @return
- *  - nullptr if packet can't be received or if packet can't be decrypted.
- *  - A Packet object that correspond to what the client send. @note You must delete
- *  this object yourself.
+ *  - nullptr if packet can't be received or if packet can't 
+ *  be decrypted.
+ *  - A Packet object that correspond to what the client send.
+ *  @note You must delete this object yourself.
 **/
+////////////////////////////////////////////////////////////
 PacketPtr server_receive_packet(server_t* server, client_t* client)
 {
     Packet* pclient = receive_client_packet(client->sock);
@@ -409,11 +473,25 @@ PacketPtr server_receive_packet(server_t* server, client_t* client)
     return pclient;
 }
 
+////////////////////////////////////////////////////////////
 /** @brief Wait for a packet to be received by the server.
- *  @note This is a non-timed out functions, blocking the thread.
- *  @note If connection cannot be checked, it automaticly returns
+ *
+ *  @param server : The server to wait.
+ *  @param client : The client to wait.
+ *
+ *  @note 
+ *  This is a non-timed out functions, blocking the thread.
+ *  If connection cannot be checked, it automaticly returns
  *  a null packet.
+ *
+ *  @return
+ *  - nullptr if packet can't be received or if packet can't
+ *  be decrypted.
+ *  - A Packet object that correspond to what the client send.
+ *  @note You must delete this object yourself.
+ *
 **/
+////////////////////////////////////////////////////////////
 PacketPtr server_wait_packet(server_t* server, client_t* client)
 {
     PacketPtr pclient = nullptr;
@@ -432,8 +510,24 @@ PacketPtr server_wait_packet(server_t* server, client_t* client)
     return pclient;
 }
 
+////////////////////////////////////////////////////////////
 /** @brief Preinterpret given packet (decrypt it if possible).
+ *
+ *  @param server : The server to use.
+ *  @param client : The client currently connected.
+ *  @param pclient : A returned Packet, which can be null. 
+ *
+ *  @note
+ *  On \c GULTRA_DEBUG mode, this function will produce many
+ *  strings. It will describe the amount of data decrypted.
+ *  This can be useful to show errors. 
+ *
+ *  @note
+ *  This function can decrypt Packet in more than one block, 
+ *  which suppose that the distant server can send parted
+ *  crypted blocks.
 **/
+////////////////////////////////////////////////////////////
 void server_preinterpret_packet(server_t* server, client_t* client, PacketPtr& pclient)
 {
     // If packet is an encrypted packet, we decrypt it and return
@@ -545,13 +639,17 @@ void server_preinterpret_packet(server_t* server, client_t* client, PacketPtr& p
     
 }
 
-
+////////////////////////////////////////////////////////////
 /** @brief Notifiates the given client that we want to unlog.
+ *
+ *  @param server : The server to use.
+ *  @param client : The client to send.
  *
  *  @return
  *  - GERROR_NONE    : No errors occured.
  *  - GERROR_BADARGS : server or client is null.
 **/
+////////////////////////////////////////////////////////////
 gerror_t server_end_user_connection(server_t* server, client_t* client)
 {
 	if(!server || !client)
@@ -573,12 +671,14 @@ gerror_t server_end_user_connection(server_t* server, client_t* client)
 	return GERROR_NONE;
 }
 
+////////////////////////////////////////////////////////////
 /** @brief Unlog user from server and notifiate every clients.
  *  
  *  @return
  *  - GERROR_NONE    : No errors occured.
  *  - GERROR_BADARGS : server is null.
 **/
+////////////////////////////////////////////////////////////
 gerror_t server_unlog(server_t* server)
 {
 	if(!server)
@@ -631,6 +731,12 @@ void* server_thread_loop(void* __serv)
     server_init_client_connection(server, localhostc, "127.0.0.1", server->port);
     server->localhost = localhostc;
     */
+    
+    ServerStartedEvent* e = new ServerStartedEvent;
+    e->type = "ServerStartedEvent";
+    e->parent = server;
+    server->sendEvent(e);
+    delete e;
 
     while(!(server->_must_stop))
     {
@@ -672,6 +778,13 @@ gerror_t server_stop(server_t* server)
     server->_must_stop = true;
     closesocket(server->sock);
     pthread_join(server->thread, nullptr);
+    
+    ServerStoppedEvent* e = new ServerStoppedEvent;
+    e->type = "ServerStoppedEvent";
+    e->parent = server;
+    server->sendEvent(e);
+    delete e;
+    
     return GERROR_NONE;
 }
 
@@ -904,12 +1017,14 @@ gerror_t server_init_user_connection(server_t* server, /* user_t& out, */ const 
 		cout << "[Server] Can't establish client '" << adress << ":" << port << "'. (Timed out)" << endl;
 		return GERROR_INVALID_CONNECT;
 	}
+    
+    client_thread_setstatus(new_client, CO_ESTABLISHING);
 	
 	// Now client connection is established, we send a packet to init user connection
 	user_init_t uinit;
-	strcpy(uinit.name, globalsession.user->name);
-	strcpy(uinit.key,  globalsession.user->key);
-	strcpy(uinit.iv,   globalsession.user->iv);
+	strcpy(uinit.name, globalsession.user->m_name->buf);
+	strcpy(uinit.key,  globalsession.user->m_key->buf);
+	strcpy(uinit.iv,   globalsession.user->m_iv->buf);
 	
 	server->client_send(new_client->mirror, PT_USER_INIT, &uinit, sizeof(uinit));
 	

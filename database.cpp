@@ -48,35 +48,92 @@ enum BlockType
 
 #pragma pack(1)
 
-typedef struct {
+typedef struct database_blockinfo_t {
     
     uint16_t type; // Type of the block. For the alignment, we use uint16_t.
     uint16_t size; // Size of the block, in bytes.
     
+    database_blockinfo_t() {
+        type = 0;
+        size = 0;
+    }
+    
 } database_blockinfo_t; // blockinfo is 32 bits.
 
-typedef struct {
+typedef struct database_block_t {
     
     database_blockinfo_t info;
     // Size of the data is info.size - sizeof(database_blockinfo_t) .
     
+    database_block_t() : info() {
+        
+    }
+    
 } database_block_t;
 
-typedef struct {
+typedef struct database_header_t {
     
     database_block_t block;
     uint16_t version_build;
     uint32_t magic;
     
+    database_header_t() : block(), version_build(0), magic(0) {
+        
+    }
+    
 } database_header_t;
 
-typedef struct {
+typedef struct database_blk_headerext_t {
     database_block_t block;
-    uint16_t name_lenght;
-    char*    name;
+    netbuffer_t name;
+    
+    database_blk_headerext_t() : block(), name() {
+        
+    }
+    
+    ~database_blk_headerext_t() {
+        netbuf_delete(&name);
+    }
+    
 } database_blk_headerext_t;
 
+typedef struct database_blk_user_t {
+    database_block_t block;
+    netbuffer_t name;
+    netbuffer_t key;
+    netbuffer_t iv;
+    float    status;
+    
+    database_blk_user_t() : block(), name(), key(), iv(), status(0.0f) {
+        
+    }
+    
+    ~database_blk_user_t() {
+        netbuf_delete(&name);
+        netbuf_delete(&key);
+        netbuf_delete(&iv);
+    }
+    
+} database_blk_user_t;
+
+typedef struct database_blk_client_t {
+    database_block_t block;
+    netbuffer_t ip;
+    uint16_t port;
+    
+    database_blk_client_t() : block(), ip(), port(0) {
+        
+    }
+    
+    ~database_blk_client_t() {
+        netbuf_delete(&ip);
+    }
+    
+} database_blk_client_t;
+
 #pragma pack()
+
+database_user_t* __current_user = nullptr;
 
 /* Read to the buffer (size 256) from encoded file. DO NOT perform any decryption. */
 uint32_t database_intern_readtobuf(FILE* encfile, unsigned char* buf256)
@@ -113,24 +170,31 @@ void database_readstring(const char*& cursor, char** out, uint32_t lenght)
     cursor += lenght;
 }
 
-void database_readformattedstring(std::string* out, unsigned char* cursor)
+void database_readformattedstring(const char*& cursor, char** outstr, uint16_t* outlen)
 {
-    /*
-    uint16_t lenght;
-    database_readuint16(&lenght, cursor);
-    char* buf = (char*) malloc(lenght+1);
-    database_readstring(&buf, lenght, cursor);
-    *out = std::string(buf);
-     */
+    // A formated string is a uint16_t, followed by a sequence of bytes.
+    uint16_t retlen = 0;
+    char* retstr = (char*) malloc(SERVER_MAXBUFSIZE);
+    database_readuint16(cursor, &retlen);
+    if(retlen > 0) {
+        database_readstring(cursor, &retstr, (uint32_t) retlen);
+    }
+    
+    if(outstr) {
+        *outstr = (char*) malloc(retlen);
+        memcpy(*outstr, retstr, retlen);
+    }
+    if(outlen) {
+        *outlen = retlen;
+    }
 }
 
-void database_readfloat(float* out, unsigned char* cursor)
+void database_readfloat(const char*& cursor, float* out)
 {
-    /*
-    FloatUint ret;
-    database_readuint32(&ret.bits, cursor);
-    *out = ret.value;
-     */
+    // To read float, we read a uint32 then convert it to float.
+    FloatUint conv;
+    database_readuint32(cursor, &conv.bits);
+    *out = conv.value;
 }
 
 gerror_t database_readheader(const char*& infp, database_header_t* header)
@@ -144,10 +208,7 @@ gerror_t database_readheader(const char*& infp, database_header_t* header)
 gerror_t database_create(database_t*& to, const std::string& dbname, const std::string& dbpass)
 {
     to = (database_t*) malloc(sizeof(database_t));
-    to->lname = dbname.length();
-    to->name = (char*) malloc(to->lname+1);
-    memcpy(to->name, dbname.c_str(), dbname.length());
-    to->name[to->lname] = '\0';
+    to->m_name = netbuf_new(dbname.c_str(), dbname.length());
     
     Encryption::user_create_keypass(to->key, to->iv, dbpass.c_str(), dbpass.length());
     
@@ -156,9 +217,8 @@ gerror_t database_create(database_t*& to, const std::string& dbname, const std::
 
 gerror_t database_create2(database_t*& to, const std::string& key, const std::string& iv)
 {
-    to = (database_t*) malloc(sizeof(database_t));
-    to->lname = 0;
-    to->name = nullptr;
+    to = new database_t;
+    to->m_name = netbuf_new(0);
     to->key = key;
     to->iv = iv;
     
@@ -169,6 +229,19 @@ void database_readblockinfo(const char*& cursor, database_blockinfo_t* blkinfo)
 {
     database_readuint16(cursor, &blkinfo->type);
     database_readuint16(cursor, &blkinfo->size);
+}
+
+void database_internal_adduserblk(database_t* db, database_blk_user_t& user)
+{
+    database_user_t* nuser = (database_user_t*) malloc(sizeof(database_user_t));
+    nuser->status = user.status;
+    
+    nuser->m_name = netbuf_copy(user.name);
+    nuser->m_key  = netbuf_copy(user.key);
+    nuser->m_iv   = netbuf_copy(user.iv);
+    
+    db->data.push_back(nuser);
+    __current_user = nuser;
 }
 
 gerror_t database_process_block(const char*& cursor, database_t*& to, const std::string& dbname, const std::string& key, const std::string& iv)
@@ -211,13 +284,57 @@ gerror_t database_process_block(const char*& cursor, database_t*& to, const std:
         cout << "[database_load] Header Extension found : " << endl;
 #endif
         
-        database_readuint16(cursor, &to->lname);
-        database_readstring(cursor, &to->name, to->lname);
+        database_readuint16(cursor, &to->m_name->lenght);
+        database_readstring(cursor, &to->m_name->buf, to->m_name->lenght);
         
 #ifdef GULTRA_DEBUG
-        cout << "   lname = " << (uint32_t) to->lname << endl;
-        cout << "   name  = " << (const char*) to->name << endl;
+        cout << "   lname = " << (uint32_t) to->m_name->lenght << endl;
+        cout << "   name  = " << (const char*) to->m_name->buf << endl;
 #endif
+    }
+    
+    else if(blkinfo.type == BT_USER)
+    {
+        // Here we enter a new section, the user section.
+        
+        database_blk_user_t new_user;
+        database_readformattedstring(cursor, & new_user.name.buf, & new_user.name.lenght);
+        database_readformattedstring(cursor, & new_user.key.buf,  & new_user.key.lenght);
+        database_readformattedstring(cursor, & new_user.iv.buf,   & new_user.iv.lenght);
+        database_readfloat(cursor, & new_user.status);
+        
+#ifdef GULTRA_DEBUG
+        cout << "[database_load] User found : " << endl;
+        cout << "   name = " << (const char*) new_user.name.buf << endl;
+        cout << "   key  = " << (const char*) new_user.key.buf  << endl;
+        cout << "   iv   = " << (const char*) new_user.iv.buf   << endl;
+        cout << "   status = " << new_user.status << endl;
+#endif
+        
+        database_internal_adduserblk(to, new_user);
+    }
+    
+    else if(blkinfo.type == BT_CLIENT)
+    {
+        if(!__current_user) {
+            exit(GERROR_DB_NOUSER);
+        }
+        // Here we read the hardware clients that have connected to this server
+        // during the session with current user.
+        database_blk_client_t hclient;
+        database_readformattedstring(cursor, &hclient.ip.buf, & hclient.ip.lenght);
+        database_readuint16(cursor, & hclient.port);
+        
+#ifdef GULTRA_DEBUG
+        cout << "[database_load] Hardware Client found : " << endl;
+        cout << "   ip = " << (const char*) hclient.ip.buf << endl;
+        cout << "   port = " << (uint32_t) hclient.port << endl;
+#endif
+        
+        database_clientinfo_t nclient;
+        nclient.ip = std::string(hclient.ip.buf, hclient.ip.lenght);
+        nclient.port = hclient.port;
+        __current_user->clients.push_back(nclient);
     }
     
     return GERROR_NONE;
@@ -256,6 +373,8 @@ gerror_t database_load(database_t*& to, const std::string& dbname, const std::st
     fclose(dbfile);
     
     std::string in(buffer, sz);
+    free(buffer);
+    
     std::string out;
     
 #ifdef GULTRA_DEBUG
@@ -287,59 +406,10 @@ gerror_t database_load(database_t*& to, const std::string& dbname, const std::st
         database_process_block(cursor, to, dbname, ikey, iiv);
     }
     /*
-    while(cursor != end)
-    {
-        memcpy(&block, cursor, sizeof(database_block_t));
-        cursor += sizeof(database_block_t);
+    
         
-        if(end - cursor + 1 < block.info.size - sizeof(database_blockinfo_t))
-        {
-            exit(GERROR_DB_FATALSTRUCT);
-        }
-        
-        if(block.info.type == BT_USER)
-        {
-            // We have a new user
-            database_user_t* usr = (database_user_t*) malloc(sizeof(database_user_t));
-            
-            database_readuint16(&usr->lname, cursor);
-            database_readstring(&usr->name, usr->lname, cursor);
-            
-            database_readuint16(&usr->lkey, cursor);
-            database_readstring(&usr->key, usr->lkey, cursor);
-            
-            database_readuint16(&usr->liv, cursor);
-            database_readstring(&usr->iv, usr->liv, cursor);
-            
-            database_readfloat(&usr->status, cursor);
-            
-            to->data.push_back(usr);
-            curuser = usr;
-        }
-        
-        else if(block.info.type == BT_HEADEREXT)
-        {
-            // Here we copy some informations about the database.
-            
-            to->key = inkey;
-            to->iv  = iniv;
-            to->path = dbname;
-            
-            database_readuint16(&to->lname, cursor);
-            database_readstring(&to->name, to->lname, cursor);
-        }
-        
-        else if(block.info.type == BT_CLIENT)
-        {
-            if(curuser)
-            {
-                database_clientinfo_t cinfo;
-                database_readformattedstring(&cinfo.ip, cursor);
-                database_readformattedstring(&cinfo.port, cursor);
-                curuser->clients.push_back(cinfo);
-            }
-        }
-        
+     
+    
         else if(block.info.type == BT_ACCEPTED)
         {
             if(curuser)
@@ -364,7 +434,7 @@ database_user_t* database_find_user(database_t* db, const std::string& username)
 {
     for(unsigned int i = 0; i < db->data.size(); ++i)
     {
-        if(username == std::string(db->data[i]->name))
+        if(username == std::string(db->data[i]->m_name->buf))
             return db->data[i];
     }
     
@@ -374,23 +444,13 @@ database_user_t* database_find_user(database_t* db, const std::string& username)
 database_user_t* database_create_user(database_t* db, const std::string& username, const std::string& userpass)
 {
     database_user_t* nuser = (database_user_t*) malloc(sizeof(database_user_t));
-    nuser->lname = username.size();
-    nuser->name = (char*) malloc(nuser->lname)+1;
-    strcpy(nuser->name, username.c_str());
-    nuser->name[nuser->lname] = 0;
+    nuser->m_name = netbuf_new(username.c_str(), username.length());
     
     std::string key; std::string iv;
     Encryption::user_create_keypass(key, iv, userpass.c_str(), userpass.size());
     
-    nuser->lkey = key.size();
-    nuser->key = (char*) malloc(nuser->lkey)+1;
-    strcpy(nuser->key, key.c_str());
-    nuser->key[nuser->lkey] = 0;
-
-    nuser->liv = iv.size();
-    nuser->iv = (char*) malloc(nuser->liv)+1;
-    strcpy(nuser->iv, iv.c_str());
-    nuser->iv[nuser->liv] = 0;
+    nuser->m_key = netbuf_new(key.c_str(), key.length());
+    nuser->m_iv  = netbuf_new(iv.c_str(),  iv.length());
     
     nuser->status = 0.0f;
     
@@ -443,8 +503,39 @@ void database_writeheaderext(std::string& f, database_blk_headerext_t& headerext
 {
     database_writeuint16(f, headerext.block.info.type);
     database_writeuint16(f, headerext.block.info.size);
-    database_writeuint16(f, headerext.name_lenght);
-    database_writestring(f, headerext.name, headerext.name_lenght);
+    database_writeuint16(f, headerext.name.lenght);
+    database_writestring(f, headerext.name.buf, headerext.name.lenght);
+}
+
+void database_writefloat(std::string& f, float& rhs)
+{
+    FloatUint conv;
+    conv.value = rhs;
+    database_writeuint32(f, conv.bits);
+}
+
+void database_writeuserblk(std::string& f, database_blk_user_t& userblk)
+{
+    database_writeuint16(f, userblk.block.info.type);
+    database_writeuint16(f, userblk.block.info.size);
+    
+    database_writeuint16(f, userblk.name.lenght);
+    database_writestring(f, userblk.name.buf, userblk.name.lenght);
+    database_writeuint16(f, userblk.key.lenght);
+    database_writestring(f, userblk.key.buf, userblk.key.lenght);
+    database_writeuint16(f, userblk.iv.lenght);
+    database_writestring(f, userblk.iv.buf, userblk.iv.lenght);
+    database_writefloat(f, userblk.status);
+}
+
+void database_writeclientblk(std::string& f, database_blk_client_t& clientblk)
+{
+    database_writeuint16(f, clientblk.block.info.type);
+    database_writeuint16(f, clientblk.block.info.size);
+    
+    database_writeuint16(f, clientblk.ip.lenght);
+    database_writestring(f, clientblk.ip.buf, clientblk.ip.lenght);
+    database_writeuint16(f, clientblk.port);
 }
 
 gerror_t database_save(database_t* database)
@@ -470,20 +561,53 @@ gerror_t database_save(database_t* database)
     database_blk_headerext_t blkheaderext;
     blkheaderext.block.info.type = BT_HEADEREXT;
     blkheaderext.block.info.size = sizeof(database_blk_headerext_t);
-    blkheaderext.name_lenght = database->lname;
-    blkheaderext.name = (char*) malloc(database->lname+1);
-    memcpy(blkheaderext.name, database->name, database->lname);
-    blkheaderext.name[blkheaderext.name_lenght] = '\0';
+    netbuf_copyraw(&blkheaderext.name, database->m_name->buf, database->m_name->lenght);
     
 #ifdef GULTRA_DEBUG
     cout << "[database_save] Writing HeaderExt block : " << endl;
-    cout << "   name_lenght = " << blkheaderext.name_lenght << endl;
-    cout << "   name = " << (const char*) blkheaderext.name << endl;
+    cout << "   name_lenght = " << blkheaderext.name.lenght << endl;
+    cout << "   name = " << (const char*) blkheaderext.name.buf << endl;
 #endif
     database_writeheaderext(in, blkheaderext);
     
+    // Destroy headerext malloc
+    netbuf_delete(&blkheaderext.name);
+    
+    // For every users in the database
+    for(uint32_t i = 0; i < database->data.size(); ++i)
+    {
+        database_user_t* dbuser = database->data.at(i);
+        
+        database_blk_user_t dbuserblk;
+        dbuserblk.block.info.type = BT_USER;
+        
+        netbuf_copyraw(& dbuserblk.name, dbuser->m_name->buf, dbuser->m_name->lenght);
+        netbuf_copyraw(& dbuserblk.key,  dbuser->m_key->buf,  dbuser->m_key->lenght);
+        netbuf_copyraw(& dbuserblk.iv,   dbuser->m_iv->buf,   dbuser->m_iv->lenght);
+        
+        dbuserblk.status = dbuser->status;
+        
+        dbuserblk.block.info.size = sizeof(database_blk_user_t) + dbuserblk.name.lenght + dbuserblk.key.lenght + dbuserblk.iv.lenght;
+        database_writeuserblk(in, dbuserblk);
+        
+        // Write every hardware clients
+        for(unsigned int j = 0; j < database->data[i]->clients.size(); ++j)
+        {
+            database_clientinfo_t& cinfo = database->data[i]->clients.at(j);
+            
+            database_blk_client_t dbclientblk;
+            dbclientblk.block.info.type = BT_CLIENT;
+            
+            netbuf_copyraw(&dbclientblk.ip, cinfo.ip.c_str(), cinfo.ip.length());
+            dbclientblk.port = cinfo.port;
+            
+            dbclientblk.block.info.size = sizeof(database_blk_client_t) + dbclientblk.ip.lenght;
+            database_writeclientblk(in, dbclientblk);
+        }
+    }
+    
 #ifdef GULTRA_DEBUG
-    cout << "[database_save] with_key = " << database->key << endl;
+    cout << "[database_save] with key = " << database->key << endl;
 #endif
     
     // Crypt the buffer with password
@@ -491,7 +615,7 @@ gerror_t database_save(database_t* database)
     //out = in;
     
     // Write everything in the file
-    FILE* fdb = fopen(database->name, "wb");
+    FILE* fdb = fopen(database->m_name->buf, "wb");
     fwrite(out.c_str(), out.length(), 1, fdb);
     fclose(fdb);
     

@@ -1,25 +1,22 @@
-/*
-    This file is part of the GangTella project.
-*/
-
-/*
-    GangTella Project
-    Copyright (C) 2014  Luk2010
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
+////////////////////////////////////////////////////////////
+//
+// GangTella - A multithreaded crypted server.
+// Copyright (c) 2014 - 2015 Luk2010 (alain.ratatouille@gmail.com)
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+////////////////////////////////////////////////////////////
 #ifndef __SERVER__H
 #define __SERVER__H
 
@@ -28,13 +25,32 @@
 #include "encryption.h"
 #include "packet.h"
 #include "user.h"
+#include "events.h"
 
 GBEGIN_DECL
 
+////////////////////////////////////////////////////////////
+/// @brief A Map organized "Clients by ID".
+////////////////////////////////////////////////////////////
 typedef std::map<uint32_t, client_t*> ClientsIdMap;
+
+////////////////////////////////////////////////////////////
+/// @brief A function to send bytes to given client.
+////////////////////////////////////////////////////////////
 typedef gerror_t (*client_send_t) (client_t*, uint8_t, const void*, size_t);
+
+////////////////////////////////////////////////////////////
+/// @brief A generic function to receive bytes from given
+/// client by name.
+////////////////////////////////////////////////////////////
 typedef void (*bytesreceived_t) (const std::string& name, size_t received, size_t total);
+
+////////////////////////////////////////////////////////////
+/// @brief A generic function to send bytes to given client,
+/// by name.
+////////////////////////////////////////////////////////////
 typedef void (*bytessend_t) (const std::string& name, size_t received, size_t total);
+
 
 typedef enum {
     SP_NORMAL  = 1,
@@ -51,7 +67,9 @@ typedef enum {
     
 } ServerStatus;
 
-typedef struct server_t {
+class server_t : public Emitter {
+public:
+    
     SOCKET                sock;
 
     std::string           name;            // Name displayed to other servers. This name is send to the client.
@@ -86,9 +104,17 @@ typedef struct server_t {
         std::string name;
         int port;
     }                     args;
-} server_t;
+    
+    const char* getName() const { return "Server"; }
+};
 
 extern server_t server;
+
+/// @brief Event sent when server is started.
+typedef Event ServerStartedEvent;
+
+/// @brief Event sent when server is stopped.
+typedef Event ServerStoppedEvent;
 
 // Before using any of the functions below, be sure every field of the server's args structure
 // has been correctly filled.

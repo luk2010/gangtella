@@ -5,7 +5,7 @@
 
 /*
     GangTella Project
-    Copyright (C) 2014  Luk2010
+    Copyright (C) 2014 - 2015  Luk2010
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -153,16 +153,19 @@ Packet* packet_choose_policy(const int type)
  *  @return nullptr on failure, a pointer to the newly received packet.
  *  This packet must be destroyed using delete.
 **/
-Packet* receive_client_packet(SOCKET sock)
+Packet* receive_client_packet(SOCKET sock, bool timedout, uint32_t sec)
 {
     if(!sock)
         return NULL;
     
-    // Set timeout to 3sec
-    struct timeval tv;
-    tv.tv_usec = 0;
-    tv.tv_sec  = 3;
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,(char*) &tv, sizeof(struct timeval));
+    if(timedout)
+    {
+        // Set timeout to sec seconds.
+        struct timeval tv;
+        tv.tv_usec = 0;
+        tv.tv_sec  = sec;
+        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,(char*) &tv, sizeof(struct timeval));
+    }
 
     PacketTypePacket ptp;
 
@@ -242,16 +245,21 @@ Packet* receive_client_packet(SOCKET sock)
     // If we are not receiving an answer, we must send an appropriate answer.
     // PT_RECEIVED_BAD if packet is null, or if packet type is PT_UNKNOWN
     // PT_RECEIVED_OK in other cases.
+    // 29/04/2015 [Note] : If packet is an Http Request, we must not send the
+    //                     first pre-answer.
     
     if(packet)
     {
-        if(packet->m_type != PT_RECEIVED_OK &&
-           packet->m_type != PT_RECEIVED_BAD)
+        if(packet->m_type != PT_HTTP_REQUEST)
         {
-            if(packet->m_type != PT_UNKNOWN)
-                send_client_packet(sock, PT_RECEIVED_OK, nullptr, 0);
-            else
-                send_client_packet(sock, PT_RECEIVED_BAD, nullptr, 0);
+            if(packet->m_type != PT_RECEIVED_OK &&
+               packet->m_type != PT_RECEIVED_BAD)
+            {
+                if(packet->m_type != PT_UNKNOWN)
+                    send_client_packet(sock, PT_RECEIVED_OK, nullptr, 0);
+                else
+                    send_client_packet(sock, PT_RECEIVED_BAD, nullptr, 0);
+            }
         }
     }
     else
@@ -467,8 +475,17 @@ gerror_t send_client_packet(SOCKET sock, uint8_t packet_type, const void* data, 
     if(packet_type != PT_RECEIVED_BAD &&
        packet_type != PT_RECEIVED_OK)
     {
-        // Wait for the answer packet
-        Packet* panswer = receive_client_packet(sock);
+        // Wait for the answer packet.
+        // If packet sent is PT_USER_INIT, we don't set any time out as it recquire a
+        // prompt from user.
+        
+        Packet* panswer = nullptr;
+        
+        if(packet_type == PT_USER_INIT)
+            panswer = receive_client_packet(sock, false);
+        else
+            panswer = receive_client_packet(sock);
+        
         if(panswer)
         {
             if(panswer->m_type == PT_RECEIVED_OK)

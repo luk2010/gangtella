@@ -65,22 +65,60 @@ gerror_t gcrypt(std::string in, std::string& out, const std::string& password)
         // Selecting current password string
         char cpass = password[curpass];
         
-        // Coding character position with password
-        uint32_t pos = (uint32_t) curin * (uint32_t) cpass;
-        pos = serialize<uint32_t>(pos);
-        // Coding character using password
-        char cret = cin + cpass;
-        
+        if(in.length() >= UINT16_MAX)
+        {
+            // Coding character position with password
+            uint32_t pos = (uint32_t) curin + (uint32_t) cpass;
+            pos = serialize<uint32_t>(pos);
+            // Coding character using password
+            char cret = cin + cpass;
+            
 #ifdef GULTRA_DEBUG
-        cout << "[gcrypt] Coding position " << (uint32_t) curin << ". (" << (uint32_t) cret << ")" << endl;
+            cout << "[gcrypt] Coding position " << (uint32_t) curin << ". (" << (uint32_t) cret << ")" << endl;
 #endif
+            
+            // Adding all this shit in the out string
+            out.push_back(((uint8_t*)&pos)[0]);
+            out.push_back(((uint8_t*)&pos)[1]);
+            out.push_back(((uint8_t*)&pos)[2]);
+            out.push_back(((uint8_t*)&pos)[3]);
+            out.push_back(cret);
+        }
         
-        // Adding all this shit in the out string
-        out.push_back(((uint8_t*)&pos)[0]);
-        out.push_back(((uint8_t*)&pos)[1]);
-        out.push_back(((uint8_t*)&pos)[2]);
-        out.push_back(((uint8_t*)&pos)[3]);
-        out.push_back(cret);
+        else if(in.length() >= UINT8_MAX)
+        {
+            // Coding character position with password
+            uint16_t pos = (uint16_t) curin + (uint16_t) cpass;
+            pos = serialize<uint16_t>(pos);
+            // Coding character using password
+            char cret = cin + cpass;
+            
+#ifdef GULTRA_DEBUG
+            cout << "[gcrypt] Coding position " << (uint32_t) curin << ". (" << (uint32_t) cret << ")" << endl;
+#endif
+            
+            // Adding all this shit in the out string
+            out.push_back(((uint8_t*)&pos)[0]);
+            out.push_back(((uint8_t*)&pos)[1]);
+            out.push_back(cret);
+        }
+        
+        else if(in.length() < UINT8_MAX)
+        {
+            // Coding character position with password
+            uint8_t pos = (uint8_t) curin + (uint8_t) cpass;
+            pos = serialize<uint8_t>(pos);
+            // Coding character using password
+            char cret = cin + cpass;
+            
+#ifdef GULTRA_DEBUG
+            cout << "[gcrypt] Coding position " << (uint32_t) curin << ". (" << (uint32_t) cret << ")[opcode=" << std::hex << (uint32_t) pos << std::dec << "]" << endl;
+#endif
+            
+            // Adding all this shit in the out string
+            out.push_back(((uint8_t*)&pos)[0]);
+            out.push_back(cret);
+        }
         
         // Setting up variables
         curpass++;
@@ -120,17 +158,46 @@ gerror_t guncrypt(std::string in, std::string& out, const std::string& password)
     
     while(cursor < in.length())
     {
-        // Read the next code position (uint32_t)
+        // Read the next code position (uint32_t, depending on total lenght)
         uint32_t nextpos = 0;
-        uint8_t* tmppos = (uint8_t*) &nextpos;
-        tmppos[0] = in[cursor+0];
-        tmppos[1] = in[cursor+1];
-        tmppos[2] = in[cursor+2];
-        tmppos[3] = in[cursor+3];
-        nextpos = deserialize<uint32_t>(nextpos);
-        nextpos = nextpos / (uint32_t) password[curpass];
         
-        cursor += 4;
+        if(totlen >= UINT16_MAX)
+        {
+            uint8_t* tmppos = (uint8_t*) &nextpos;
+            tmppos[0] = in[cursor+0];
+            tmppos[1] = in[cursor+1];
+            tmppos[2] = in[cursor+2];
+            tmppos[3] = in[cursor+3];
+            cursor += 4;
+            
+            nextpos = deserialize<uint32_t>(nextpos);
+            nextpos = nextpos - (uint32_t) password[curpass];
+        }
+        
+        else if(totlen >= UINT8_MAX)
+        {
+            uint16_t tmpconv;
+            uint8_t* tmppos = (uint8_t*) &tmpconv;
+            tmppos[0] = in[cursor+0];
+            tmppos[1] = in[cursor+1];
+            cursor += 2;
+            
+            tmpconv = deserialize<uint16_t>(tmpconv);
+            tmpconv = tmpconv - (uint16_t) password[curpass];
+            nextpos = (uint32_t) tmpconv;
+        }
+        
+        else if(totlen < UINT8_MAX)
+        {
+            uint8_t tmpconv;
+            uint8_t* tmppos = (uint8_t*) &tmpconv;
+            tmppos[0] = in[cursor+0];
+            cursor += 1;
+            
+            tmpconv = deserialize<uint8_t>(tmpconv);
+            tmpconv = tmpconv - (uint8_t) password[curpass];
+            nextpos = (uint32_t) tmpconv;
+        }
         
         // Validate position
         if(nextpos >= totlen) {

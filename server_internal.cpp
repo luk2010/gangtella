@@ -71,7 +71,7 @@ std::string server_http_compute_home(server_t* server)
     << "  <body>"
     << "    <h1>" << server->name << " Home</h1>";
     if(globalsession.user)
-        hp << "    <p>Current user logged : " << globalsession.user->name << ".</p>";
+        hp << "    <p>Current user logged : " << globalsession.user->m_name->buf << ".</p>";
     hp << "  </body>"
     << "</html>";
     return hp.str();
@@ -256,6 +256,12 @@ void* accepting_thread_loop(void* data)
                  dbc.port = std::to_string(cip->info.s_port);
                  globalsession.user->clients.push_back(dbc);*/
                 //}
+                
+                // 04/05/2015 : We must create here the logged_user field if it has not been done already.
+                if(!new_client->logged_user)
+                {
+                    new_client->logged_user = new user_t();
+                }
             }
             
             else
@@ -278,6 +284,12 @@ void* accepting_thread_loop(void* data)
                 server_create_client_thread_loop(server, new_client);
                 
                 // Now the pointed client should send us a PT_CLIENT_ESTABLISHED packet.
+                
+                // 04/05/2015 : We must create here the logged_user field if it has not been done already.
+                if(!new_client->logged_user)
+                {
+                    new_client->logged_user = new user_t();
+                }
             }
             
         }

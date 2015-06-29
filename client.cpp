@@ -73,6 +73,8 @@ gerror_t client_alloc (clientptr_t* ret, uint32_t id, clientptr_t mirror, void* 
         client->server = cserver;
     }
     
+    client->logged_user = nullptr;
+    
     *ret = client;
     return GERROR_NONE;
 }

@@ -40,12 +40,31 @@ public:
     
     /** @brief Called when the Server is started.
     **/
-    virtual void onServerStarted(const ServerStartedEvent* e) = 0;
+    virtual void onServerStarted(const ServerStartedEvent* e) { }
     
     /** @brief Called when the Server is stopped.
     **/
-    virtual void onServerStopped(const ServerStoppedEvent* e) = 0;
+    virtual void onServerStopped(const ServerStoppedEvent* e) { }
     
+    /** @brief Called just before Server is stopped.
+    **/
+    virtual void onServerWillStop(const ServerWillStopEvent* e) { }
+    
+    /** @brief Called when the Server created a new client. 
+     *  Usually, this significate that an incoming connection has been requesting
+     *  the creation of a client.
+     *  @see onClientCompleted(), for a handler when the Client is created by the
+     *  Server, and the request has been completed by the outcoming Server.
+    **/
+    virtual void onClientCreated(const ServerNewClientCreatedEvent* e) { }
+    
+    /** @brief Called when the Server has completed a new client connection.
+    **/
+    virtual void onClientCompleted(const ServerClientCompletedEvent* e) { }
+    
+    /** @brief Called when an HTTP request is send to the server. 
+    **/
+    virtual void onHttpRequest(const ServerHttpRequestEvent* e) { }
 };
 
 GEND_DECL

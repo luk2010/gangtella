@@ -24,7 +24,31 @@
 #include "server.h"
 #include "server_intern.h"
 
+#include "serverlistener.h"
+
 GBEGIN_DECL
+
+class InternalServerListener : public ServerListener
+{
+public:
+    
+    void onClientCreated(const ServerNewClientCreatedEvent* e)
+    {
+        Server* s = reinterpret_cast<Server*>(e->parent);
+        registerClientToDatabase(s, e->client);
+    }
+    
+    void onClientCompleted(const ServerClientCompletedEvent* e)
+    {
+        Server* s = reinterpret_cast<Server*>(e->parent);
+        registerClientToDatabase(s, e->client);
+    }
+    
+    void registerClientToDatabase(Server* s, client_t* c)
+    {
+        
+    }
+};
 
 #define server_access() gthread_mutex_lock(&server->mutex)
 #define server_stopaccess() gthread_mutex_unlock(&server->mutex)
@@ -262,6 +286,14 @@ void* accepting_thread_loop(void* data)
                 {
                     new_client->logged_user = new user_t();
                 }
+                
+                // Notifiate the Listeners that a new client has been created.
+                ServerNewClientCreatedEvent* e = new ServerNewClientCreatedEvent;
+                e->type   = "ServerNewClientCreatedEvent";
+                e->parent = server;
+                e->client = cclient;
+                server->sendEvent(e);
+                delete e;
             }
             
             else
@@ -290,6 +322,14 @@ void* accepting_thread_loop(void* data)
                 {
                     new_client->logged_user = new user_t();
                 }
+                
+                // Notifiate the listeners that the client has been completed.
+                ServerClientCompletedEvent* e = new ServerClientCompletedEvent;
+                e->type   = "ServerClientCompletedEvent";
+                e->parent = server;
+                e->client = new_client;
+                server->sendEvent(e);
+                delete e;
             }
             
         }
@@ -319,6 +359,8 @@ void* accepting_thread_loop(void* data)
             send(csock, hp.str().c_str(), hp.str().size(), 0);
             //                send(csock, buf.c_str(),      buf.size(),      0);
             closesocket(csock);
+            
+            
             
             delete request;
         }

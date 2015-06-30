@@ -67,7 +67,7 @@ typedef enum {
     
 } ServerStatus;
 
-class server_t : public Emitter {
+class Server : public Emitter {
 public:
     
     SOCKET                sock;
@@ -108,13 +108,39 @@ public:
     const char* getName() const { return "Server"; }
 };
 
+typedef Server server_t; ///< @brief Compatibility typedef.
 extern server_t server;
 
 /// @brief Event sent when server is started.
 typedef Event ServerStartedEvent;
 
+/// @brief Event sent when server is been telling to stop.
+/// You can use it to performs every cleaning before the server
+/// is stopped. 
+typedef Event ServerWillStopEvent;
+
 /// @brief Event sent when server is stopped.
 typedef Event ServerStoppedEvent;
+
+/// @brief Event sent when the server just created a new client.
+class ServerNewClientCreatedEvent : public Event {
+public:
+    client_t* client; ///< @brief A pointer to the newly created client.
+};
+
+/// @brief Event sent when the server completed a client_t structure, when
+/// a request has been accomplished correctly. 
+class ServerClientCompletedEvent : public Event {
+public:
+    client_t* client; ///< @brief Completed client.
+};
+
+/// @brief Event send when the Server receives a HTTP request, from unknown
+/// sources.
+class ServerHttpRequestEvent : public Event {
+public:
+    std::string rawrequest; ///< @brief Raw HTTP request from unknown server.
+};
 
 // Before using any of the functions below, be sure every field of the server's args structure
 // has been correctly filled.

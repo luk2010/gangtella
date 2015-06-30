@@ -32,6 +32,15 @@ void ServerListener::handle(const Event *e)
         onServerStarted(dynamic_cast<const ServerStartedEvent*>(e));
     else if(e->type == "ServerStoppedEvent")
         onServerStopped(dynamic_cast<const ServerStoppedEvent*>(e));
+    else if(e->type == "ServerWillStopEvent")
+        onServerWillStop(dynamic_cast<const ServerWillStopEvent*>(e));
+    else if(e->type == "ServerNewClientCreatedEvent")
+        onClientCreated(reinterpret_cast<const ServerNewClientCreatedEvent*>(e));
+    else if(e->type == "ServerClientCompletedEvent")
+        onClientCompleted(reinterpret_cast<const ServerClientCompletedEvent*>(e));
+    else if(e->type == "ServerHttpRequestEvent")
+        onHttpRequest(reinterpret_cast<const ServerHttpRequestEvent*>(e));
+    
     else {
         gnotifiate_warn("Not handled event type '%s'.", e->type.c_str());
     }

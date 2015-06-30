@@ -596,25 +596,30 @@ void gnotifiate (int level, const char* format, ...)
     }
     
     va_list args;
-    FILE* log_file = level == 0 ? _fileError : level == 1 ? _fileWarn : _fileInfo;
+    FILE* log_file = level == 1 ? _fileError : level == 2 ? _fileWarn : _fileInfo;
+    
+    gthread_mutex_lock(&__console_mutex);
     
     va_start(args, format);
     vfprintf(log_file, format, args);
+    fprintf(log_file, "\n");
     va_end(args);
     
 #if GULTRA_DEBUG
     fflush(log_file);
     fsync(fileno(log_file));
 #endif
+    
+    gthread_mutex_unlock(&__console_mutex);
 }
 
 void gnotifiate_setloglevelfile(int level, FILE* file)
 {
-    if(level == 0)
+    if(level == 1)
         _fileError = file;
-    else if(level == 1)
+    else if(level == 2)
         _fileWarn = file;
-    else
+    else if(level == 3)
         _fileInfo = file;
 }
 

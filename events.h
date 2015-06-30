@@ -32,12 +32,12 @@ class Listener;
  *  This can be dynamicly casted to another event structure
  *  according to its type.
  **/
-typedef struct
+class Event
 {
+public:
     Emitter* parent;  ///< @brief Parent of this event. Should not be null.
     std::string type; ///< @brief Type of the event.
-    
-} Event;
+};
 
 /** @brief An emitter is an object that send event to every listeners
  *  registered.
@@ -87,6 +87,19 @@ public:
      *  object.
     **/
     virtual void handle(const Event* e) { }
+};
+
+// Some generals Events can be defined directly here, as they do not rely on
+// any dependancy.
+
+/// @brief A simple event, usually send in a context where an object receives some bytes.
+struct BytesReceivedEvent : Event {
+    uint32_t numbytes; ///< @brief Number of bytes received during the transaction.
+};
+
+/// @brief A simple event, usually send in a context where an object send some bytes.
+struct BytesSendEvent : Event {
+    uint32_t numbytes; ///< @brief Number of bytes send during the transaction.
 };
 
 GEND_DECL

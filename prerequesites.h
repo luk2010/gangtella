@@ -74,9 +74,9 @@
 #define _PANIC_ON_ERROR
 
 #ifdef _DEBUG
-#define GVERSION_BUILD "13d"
+#define GVERSION_BUILD "15d"
 #else
-#define GVERSION_BUILD "13"
+#define GVERSION_BUILD "15"
 #endif // _DEBUG
 
 #define GANGTELLA_VERSION GVERSION_MAJ "." GVERSION_MIN "." GVERSION_BUILD
@@ -425,13 +425,13 @@ void netbuf_free(netbuffer_t*& buf);// Also nullize the buffer.
 
 #include "structs.h"
 
-struct server_t;
+class Server;
 
 struct session_t
 {
     database_t* database;
     user_t*     user;
-    server_t*   server;
+    Server*   server;
     bool _treatingcommand;
 };
 

@@ -775,6 +775,12 @@ gerror_t server_stop(server_t* server)
     if(!server)
         return GERROR_BADARGS;
     
+    ServerWillStopEvent* e1 = new ServerWillStopEvent;
+    e1->type = "ServerWillStopEvent";
+    e1->parent = server;
+    server->sendEvent(e1);
+    delete e1;
+    
     server->_must_stop = true;
     closesocket(server->sock);
     pthread_join(server->thread, nullptr);

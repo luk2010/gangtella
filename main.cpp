@@ -205,12 +205,19 @@ void display_help()
     << " --max-buffer  : Specify the Maximum buffer size for a packet. "    << endl; cout
     << "                 Default is 1096."                                  << endl; cout
     << " --no-ssl      : Begins a session without OpenSSL (at your own risk.)" << endl; cout
+    << " --logfile-info : Sets the file to redirect info log." << endl; cout
+    << " --logfile-warn : Sets the file to redirect warning log." << endl; cout
+    << " --logfile-err  : Sets the file to redirect error log." << endl; cout
 
     << "== Others args ==" << endl; cout
 
     << " --help        : Show this text."                                   << endl; cout
     << " --usr-help    : Show a help text on how to connect to the Network."<< endl; cout
-    << " --version     : Show the version number."                          << endl;
+    << " --version     : Show the version number."                          << endl; cout
+    << " --test-unit-a : Launch the program as Test Unit A (s-port=8378, dbname=a," << endl; cout
+    << "                 dbpass=a, s-name=a, username=a, userpass=a, log=a.log)" << endl; cout
+    << " --test-unit-b : Launch the program as Test Unit B (s-port=7777, dbname=b," << endl; cout
+    << "                 dbpass=b, s-name=b, username=b, userpass=b, log=b.log)" << endl;
 
 }
 
@@ -240,10 +247,6 @@ public:
 
 int main(int argc, char* argv[])
 {
-    cout << "GangTella v." << GANGTELLA_VERSION << "."  << endl;
-
-
-
     // Argues
 
     server.args.port          = 8378;
@@ -256,6 +259,10 @@ int main(int argc, char* argv[])
     std::string ncuserpass("");
     std::string dbname("");
     std::string ncdbpass("");
+    
+    FILE* loginfo = nullptr;
+    FILE* logwarn = nullptr;
+    FILE* logerr  = nullptr;
 
     for(int i = 0; i < argc; ++i)
     {
@@ -317,7 +324,55 @@ int main(int argc, char* argv[])
             ncdbpass = argv[i+1];
             i++;
         }
+        
+        else if(std::string("--logfile-info") == argv[i])
+        {
+            loginfo = fopen(argv[i+1], "w");
+        }
+        else if(std::string("--logfile-warn") == argv[i])
+        {
+            logwarn = fopen(argv[i+1], "w");
+        }
+        else if(std::string("--logfile-err") == argv[i])
+        {
+            logerr = fopen(argv[i+1], "w");
+        }
+        
+        // If we have --test-unit option set, we overwrite every options.
+        if(std::string("--test-unit-a") == argv[i])
+        {
+            server.args.port = 8378;
+            server.args.name = "A";
+            dbname           = "test-unit-a.db";
+            ncdbpass         = "a";
+            username         = "a";
+            ncuserpass       = "a";
+            
+            loginfo = fopen("a.info.log", "w");
+            logwarn = fopen("a.warn.log", "w");
+            logerr  = fopen("a.err.log", "w");
+        }
+        else if(std::string("--test-unit-b") == argv[i])
+        {
+            server.args.port = 7777;
+            server.args.name = "B";
+            dbname           = "test-unit-b.db";
+            ncdbpass         = "b";
+            username         = "b";
+            ncuserpass       = "b";
+            
+            loginfo = fopen("b.info.log", "w");
+            logwarn = fopen("b.warn.log", "w");
+            logerr  = fopen("b.err.log", "w");
+        }
     }
+    
+    // Set the logging files.
+    gnotifiate_setloglevelfile(1, logerr  ? logerr  : stderr);
+    gnotifiate_setloglevelfile(2, logwarn ? logwarn : stderr);
+    gnotifiate_setloglevelfile(3, loginfo ? loginfo : stdout);
+    
+    gnotifiate_info("GangTella v.%s.", GANGTELLA_VERSION);
     
     // Register our listener.
     TestServerListener* tsl = new TestServerListener;
@@ -563,6 +618,14 @@ int main(int argc, char* argv[])
     // Cleaning our listener
     server.removeListener(tsl);
     delete tsl;
+    
+    // Clean the log system
+    if(loginfo)
+        fclose(loginfo);
+    if(logwarn)
+        fclose(logwarn);
+    if(logerr)
+        fclose(logerr);
 
     cout << "[Main] Goodbye." << endl;
     return 0;

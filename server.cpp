@@ -23,12 +23,40 @@
 #include "server_intern.h"
 #include "packet.h"
 #include "commands.h"
+#include "serverlistener.h"
 
 GBEGIN_DECL
 
 #define server_access() gthread_mutex_lock(&server->mutex)
 #define server_stopaccess() gthread_mutex_unlock(&server->mutex)
 
+class InternalServerListener : public ServerListener
+{
+public:
+    
+    void onClientCreated(const ServerNewClientCreatedEvent* e)
+    {
+        Server* server = reinterpret_cast<Server*>(e->parent);
+        // For now, the client is unlogged. So we can register
+        // it to the unlogged clients vector.
+        server_access();
+        server->_unlogged_clients.push_back(e->client);
+        server_stopaccess();
+    }
+    
+    void onClientCompleted(const ServerClientCompletedEvent* e)
+    {
+        Server* server = reinterpret_cast<Server*>(e->parent);
+        // For now, the client is unlogged. So we can register
+        // it to the unlogged clients vector.
+        server_access();
+        server->_unlogged_clients.push_back(e->client);
+        server_stopaccess();
+    }
+    
+};
+
+InternalServerListener* _listener = nullptr;
 server_t server;
 
 void* server_thread_loop (void*);
@@ -131,6 +159,8 @@ gerror_t server_create()
         }
         
         server.status = SS_CREATED;
+        _listener = new InternalServerListener;
+        server.addListener(_listener);
     }
     gthread_mutex_unlock(&server.mutex);
     return GERROR_NONE;
@@ -347,6 +377,9 @@ gerror_t server_destroy(server_t* server)
 #endif // _WIN32
 
     cout << "[Server] Server destroyed." << endl;
+    
+    if(_listener)
+        delete _listener;
 
     if(!gthread_mutex_unlock(&server->mutex))
         return GERROR_MUTEX_UNLOCK;
@@ -497,7 +530,7 @@ PacketPtr server_wait_packet(server_t* server, client_t* client)
     PacketPtr pclient = nullptr;
     
     // We wait for a packet to come.
-    gerror_t err = packet_wait(client->sock, pclient);
+    gerror_t err = packet_wait(client->sock, client->mirror->sock, pclient);
     
     if(err != GERROR_NONE)
     {
@@ -663,7 +696,7 @@ gerror_t server_end_user_connection(server_t* server, client_t* client)
 		return GERROR_NONE;
 	}
 	
-	server->client_send(client->mirror, PT_USER_END, NULL, 0);
+	server->client_send(client, PT_USER_END, NULL, 0);
 	
 	// Now client should send us packet PT_USER_END_RESPONSE and our local client
 	// will unlog from him too.
@@ -921,7 +954,7 @@ gerror_t server_init_client_connection(server_t* server, client_t*& out, const c
     buffer_copy(info.pubkey, *(server->pubkey));
 
     client_info_t serialized = serialize<client_info_t>(info);
-    client_send_packet(mirror, PT_CLIENT_INFO, &serialized, sizeof(client_info_t));
+    client_send_packet(new_client, PT_CLIENT_INFO, &serialized, sizeof(client_info_t));
 
     // Now the destination should receive the PT_CLIENT_INFO packet, and send us
     // PT_CLIENT_INFO        to complete the client_t structure
@@ -933,7 +966,7 @@ gerror_t server_init_client_connection(server_t* server, client_t*& out, const c
     cout << "[Server] Client inited." << endl;
 #endif // GULTRA_DEBUG
 
-    out = server->client_by_id[mirror->id];
+    out = server->client_by_id[new_client->mirror->id];
     return GERROR_NONE;
 }
 
@@ -958,33 +991,55 @@ void server_end_client(server_t* server, const std::string& client_name)
         client_t* client = server_find_client_by_name(server, client_name);
         if(client)
         {
-            gthread_mutex_lock(&server->mutex);
-
-            uint32_t id = ID_CLIENT_INVALID;
-
-            pthread_cancel(client->server_thread);
-            if(client->sock != 0)
+            // Launching an event to notifiate the near ending
+            // of this client connection.
+            ServerClientClosingEvent* e1 = new ServerClientClosingEvent;
+            e1->type   = "ServerClientClosingEvent";
+            e1->parent = server;
+            e1->client = client;
+            server->sendEvent(e1);
+            delete e1;
+            
             {
-                if(client->mirror != NULL)
+                gthread_mutex_lock(&server->mutex);
+                uint32_t id = ID_CLIENT_INVALID;
+                
+                pthread_cancel(client->server_thread);
+                if(client->sock != 0)
                 {
-                    client_close(client->mirror);
-                    id = client->mirror->id;
-                    delete client->mirror;
-                    client->mirror = 0;
+                    if(client->mirror != NULL)
+                    {
+                        client_close(client->mirror);
+                        id = client->mirror->id;
+                        delete client->mirror;
+                        client->mirror = 0;
+                    }
+                    
+                    closesocket(client->sock);
                 }
-
-                closesocket(client->sock);
+                
+                if(client->logged)
+                {
+                    user_destroy(client->logged_user);
+                    client->logged = false;
+                }
+                
+                // Launch an event to notifiate Listeners that the Client has been
+                // closed.
+                ServerClientClosedEvent* e2 = new ServerClientClosedEvent;
+                e2->type   = "ServerClientClosedEvent";
+                e2->parent = server;
+                e2->client = client;
+                server->sendEvent(e2);
+                delete e2;
+                
+                // Delete the client.
+                server->clients.erase(server->clients.begin() + server_find_client_index_private_(server, client_name));
+                server->client_by_id[id] = nullptr;
+                gthread_mutex_unlock(&server->mutex);
             }
             
-            if(client->logged)
-			{
-				user_destroy(client->logged_user);
-				client->logged = false;
-			}
-
-            server->clients.erase(server->clients.begin() + server_find_client_index_private_(server, client_name));
-            server->client_by_id[id] = nullptr;
-            gthread_mutex_unlock(&server->mutex);
+            
         }
     }
 }
@@ -1032,7 +1087,7 @@ gerror_t server_init_user_connection(server_t* server, /* user_t& out, */ const 
 	strcpy(uinit.key,  globalsession.user->m_key->buf);
 	strcpy(uinit.iv,   globalsession.user->m_iv->buf);
 	
-	server->client_send(new_client->mirror, PT_USER_INIT, &uinit, sizeof(uinit));
+	server->client_send(new_client, PT_USER_INIT, &uinit, sizeof(uinit));
 	
 	// Wait for the client to be logged in
 	while(new_client->logged == false);

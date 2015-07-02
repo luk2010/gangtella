@@ -24,31 +24,7 @@
 #include "server.h"
 #include "server_intern.h"
 
-#include "serverlistener.h"
-
 GBEGIN_DECL
-
-class InternalServerListener : public ServerListener
-{
-public:
-    
-    void onClientCreated(const ServerNewClientCreatedEvent* e)
-    {
-        Server* s = reinterpret_cast<Server*>(e->parent);
-        registerClientToDatabase(s, e->client);
-    }
-    
-    void onClientCompleted(const ServerClientCompletedEvent* e)
-    {
-        Server* s = reinterpret_cast<Server*>(e->parent);
-        registerClientToDatabase(s, e->client);
-    }
-    
-    void registerClientToDatabase(Server* s, client_t* c)
-    {
-        
-    }
-};
 
 #define server_access() gthread_mutex_lock(&server->mutex)
 #define server_stopaccess() gthread_mutex_unlock(&server->mutex)
@@ -244,7 +220,7 @@ void* accepting_thread_loop(void* data)
                 buffer_copy(info.pubkey, *(server->pubkey));
                 
                 client_info_t serialized = serialize<client_info_t>(info);
-                if(client_send_packet(new_client->mirror, PT_CLIENT_INFO, &serialized, sizeof(serialized)) != GERROR_NONE)
+                if(send_client_packet(new_client->mirror->sock, SOCKET_ERROR, PT_CLIENT_INFO, &serialized, sizeof(serialized)) != GERROR_NONE)
                 {
                     cout << "[Server] Can't send packet 'PT_CLIENT_INFO' to client '" << new_client->name << "'." << endl;
                     
@@ -265,21 +241,8 @@ void* accepting_thread_loop(void* data)
                 client_t* cclient = server->client_by_id[new_client->mirror->id];
                 cclient->established = true;
                 
-                // We now send the PT_CONNECTION_ESTABLISHED packet and create the client thread.
-                server_create_client_thread_loop(server, cclient);
-                server->client_send(cclient->mirror, PT_CLIENT_ESTABLISHED, NULL, 0);
-                
                 // If everything is alright, we can tell user
                 cout << "[Server] New Client connected (name = '" << cclient->name << "', id = '" << cclient->mirror->id << "')." << endl;
-                
-                // As client is valid, we can save it to the database.
-                //if(user_database_isloaded())
-                //{
-                /*dbclient_t dbc;
-                 dbc.ip   = std::string(inet_ntoa(csin.sin_addr));
-                 dbc.port = std::to_string(cip->info.s_port);
-                 globalsession.user->clients.push_back(dbc);*/
-                //}
                 
                 // 04/05/2015 : We must create here the logged_user field if it has not been done already.
                 if(!new_client->logged_user)
@@ -294,6 +257,10 @@ void* accepting_thread_loop(void* data)
                 e->client = cclient;
                 server->sendEvent(e);
                 delete e;
+                
+                // We now send the PT_CONNECTION_ESTABLISHED packet and create the client thread.
+                server->client_send(cclient, PT_CLIENT_ESTABLISHED, NULL, 0);
+                server_create_client_thread_loop(server, cclient);
             }
             
             else
@@ -312,8 +279,13 @@ void* accepting_thread_loop(void* data)
                 cout << std::string(reinterpret_cast<const char*>(new_client->pubkey.buf), new_client->pubkey.size) << endl;
 #endif // GULTRA_DEBUG
                 
-                // Once complete we create the thread
-                server_create_client_thread_loop(server, new_client);
+                // Notifiate the listeners that the client has been created.
+                ServerNewClientCreatedEvent* e = new ServerNewClientCreatedEvent;
+                e->type = "ServerNewClientCreatedEvent";
+                e->parent = server;
+                e->client = new_client;
+                server->sendEvent(e);
+                delete e;
                 
                 // Now the pointed client should send us a PT_CLIENT_ESTABLISHED packet.
                 
@@ -324,12 +296,15 @@ void* accepting_thread_loop(void* data)
                 }
                 
                 // Notifiate the listeners that the client has been completed.
-                ServerClientCompletedEvent* e = new ServerClientCompletedEvent;
-                e->type   = "ServerClientCompletedEvent";
-                e->parent = server;
-                e->client = new_client;
-                server->sendEvent(e);
-                delete e;
+                ServerClientCompletedEvent* e1 = new ServerClientCompletedEvent;
+                e1->type   = "ServerClientCompletedEvent";
+                e1->parent = server;
+                e1->client = new_client;
+                server->sendEvent(e1);
+                delete e1;
+                
+                // Once complete we create the thread
+                server_create_client_thread_loop(server, new_client);
             }
             
         }
@@ -360,7 +335,13 @@ void* accepting_thread_loop(void* data)
             //                send(csock, buf.c_str(),      buf.size(),      0);
             closesocket(csock);
             
-            
+            // Notifiate the listeners of the http request.
+            ServerHttpRequestEvent* e = new ServerHttpRequestEvent;
+            e->type = "ServerHttpRequestEvent";
+            e->parent = server;
+            e->rawrequest = request->request;
+            server->sendEvent(e);
+            delete e;
             
             delete request;
         }

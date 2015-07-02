@@ -58,6 +58,14 @@ public:
     **/
     virtual void onClientCreated(const ServerNewClientCreatedEvent* e) { }
     
+    /** @brief Called when a client is about to be closed.
+    **/
+    virtual void onClientClosing(const ServerClientClosingEvent* e) { }
+    
+    /** @brief Called when a client has been closed.
+    **/
+    virtual void onClientClosed(const ServerClientClosedEvent* e) { }
+    
     /** @brief Called when the Server has completed a new client connection.
     **/
     virtual void onClientCompleted(const ServerClientCompletedEvent* e) { }

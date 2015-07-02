@@ -106,6 +106,11 @@ public:
     }                     args;
     
     const char* getName() const { return "Server"; }
+    
+    // New API variables
+    std::vector<client_t*> _unlogged_clients; ///< @brief List of clients currently connected, but not logged in yet.
+                                              ///  Those clients are not saved in the database. 
+    
 };
 
 typedef Server server_t; ///< @brief Compatibility typedef.
@@ -133,6 +138,21 @@ public:
 class ServerClientCompletedEvent : public Event {
 public:
     client_t* client; ///< @brief Completed client.
+};
+
+/// @brief Sent when a client will be closed by the server, due
+/// to a command or other reason.
+class ServerClientClosingEvent : public Event {
+public:
+    client_t* client; ///< @brief The closing client.
+};
+
+/// @brief Sent just after the connection to the client
+/// is closed. At this point, the mirror client should be
+/// null.
+class ServerClientClosedEvent : public Event {
+public:
+    client_t* client; ///< @brief The just closed client.
 };
 
 /// @brief Event send when the Server receives a HTTP request, from unknown

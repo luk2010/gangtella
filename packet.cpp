@@ -133,7 +133,9 @@ Packet* packet_choose_policy(const int type)
 	case PT_USER_INIT_RESPONSE:
 		return new UserInitRPacket();
     default:
-        return new Packet();
+        Packet* p = new Packet();
+        p->m_type = type;
+        return p;
     }
 }
 
@@ -153,10 +155,13 @@ Packet* packet_choose_policy(const int type)
  *  @return nullptr on failure, a pointer to the newly received packet.
  *  This packet must be destroyed using delete.
 **/
-Packet* receive_client_packet(SOCKET sock, bool timedout, uint32_t sec)
+Packet* receive_client_packet(SOCKET sock, SOCKET retsock, bool timedout, uint32_t sec)
 {
     if(!sock)
         return NULL;
+    
+    if(!retsock)
+        retsock = sock;
     
     if(timedout)
     {
@@ -204,6 +209,21 @@ Packet* receive_client_packet(SOCKET sock, bool timedout, uint32_t sec)
         // Return it
         packet = (Packet*) retv;
         skipdata = true;
+    }
+    
+    // If packet is a PT_CONNECTION_STATUS, directly send an answer back.
+    if(ptp.type == PT_CONNECTIONSTATUS)
+    {
+        cout << "[receive_packet] Received Connection status. Sending OK. " << endl;
+        send_client_packet(retsock, SOCKET_ERROR, PT_RECEIVED_OK, nullptr, 0);
+        return packet_choose_policy(PT_CONNECTIONSTATUS);
+    }
+    
+    // If packet is a normal answer, just return PT_RECEIVED_OK or PT_RECEIVED_BAD
+    // packets.
+    if(ptp.type == PT_RECEIVED_OK || ptp.type == PT_RECEIVED_BAD)
+    {
+        return packet_choose_policy(ptp.type);
     }
     
     if(!skipdata)
@@ -256,15 +276,15 @@ Packet* receive_client_packet(SOCKET sock, bool timedout, uint32_t sec)
                packet->m_type != PT_RECEIVED_BAD)
             {
                 if(packet->m_type != PT_UNKNOWN)
-                    send_client_packet(sock, PT_RECEIVED_OK, nullptr, 0);
+                    send_client_packet(retsock, SOCKET_ERROR, PT_RECEIVED_OK, nullptr, 0);
                 else
-                    send_client_packet(sock, PT_RECEIVED_BAD, nullptr, 0);
+                    send_client_packet(retsock, SOCKET_ERROR, PT_RECEIVED_BAD, nullptr, 0);
             }
         }
     }
     else
     {
-        send_client_packet(sock, PT_RECEIVED_BAD, nullptr, 0);
+        send_client_packet(retsock, SOCKET_ERROR, PT_RECEIVED_BAD, nullptr, 0);
     }
     
     // Return the packet.
@@ -377,15 +397,16 @@ gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size
  *  @param sock : Socket to wait.
  *  @param retpacket : A pointer to null.
 **/
-gerror_t packet_wait(SOCKET sock, PacketPtr& retpacket)
+gerror_t packet_wait(SOCKET sock, SOCKET retsock, PacketPtr& retpacket)
 {
     if(!sock || retpacket != nullptr)
         return GERROR_BADARGS;
     
     while (!retpacket)
     {
+        cout << "[packet_wait] Waiting for packet." << endl;
         // First we wait 3 seconds for a packet to come.
-        retpacket = receive_client_packet(sock);
+        retpacket = receive_client_packet(sock, retsock);
         
         if(retpacket)
         {
@@ -395,9 +416,10 @@ gerror_t packet_wait(SOCKET sock, PacketPtr& retpacket)
         
         else
         {
+            cout << "[packet_wait] Sending connection status. " << endl;
             // If nothing has been received, just send a connection status packet
             // to check connection with the socket.
-            gerror_t err = send_client_packet(sock, PT_CONNECTIONSTATUS, nullptr, 0);
+            gerror_t err = send_client_packet(retsock, sock, PT_CONNECTIONSTATUS, nullptr, 0);
             if(err != GERROR_NONE)
             {
 #ifdef GULTRA_DEBUG
@@ -430,7 +452,9 @@ gerror_t packet_wait(SOCKET sock, PacketPtr& retpacket)
  *  or the client_send_packet() with data as your buffer and sz as the size
  *  of the buffer.
  *
- *  @param sock        : Socket to send the packet.
+ *  @param upsock      : Socket to send the packet.
+ *  @param downsock     : Socket to receive the PT_RECEIVED_OK or PT_RECEIVED_BAD
+ *                       answers. If SOCKET_ERROR, no receiving packets will be asked.
  *  @param packet_type : Type of the packet to send.
  *  @param data        : Data to send, corresponding to the exact byte pattern
  *  of the packet.
@@ -441,16 +465,17 @@ gerror_t packet_wait(SOCKET sock, PacketPtr& retpacket)
  *  - GERROR_BADARGS if sock is null or if packet_type is invalid.
  *  - GERROR_CANT_SEND_PACKET if recv() function fails.
 **/
-gerror_t send_client_packet(SOCKET sock, uint8_t packet_type, const void* data, size_t sz)
+gerror_t send_client_packet(SOCKET upsock, SOCKET downsock, uint8_t packet_type, const void* data, size_t sz)
 {
-    if(!sock)
+    if(!upsock)
         return GERROR_BADARGS;
     if(packet_type == PT_UNKNOWN)
         return GERROR_BADARGS;
 
+    cout << "[send_client_packet] Sending packet type " << (uint32_t) packet_type << endl;
     // Send the PT_PACKETTYPE first
     PacketTypePacket ptp(packet_type);
-    if(send(sock, (data_t*) &ptp, ptp.getPacketSize(), 0) < 0)
+    if(send(upsock, (data_t*) &ptp, ptp.getPacketSize(), 0) < 0)
     {
         cout << "[Packet] Can't send PT_PACKETTYPE." << endl;
         return GERROR_CANT_SEND_PACKET;
@@ -459,12 +484,16 @@ gerror_t send_client_packet(SOCKET sock, uint8_t packet_type, const void* data, 
     // Send the data if any.
     if(sz > 0 && data != NULL)
     {
-        if(send(sock, (data_t*) data, sz, 0) < 0)
+        if(send(upsock, (data_t*) data, sz, 0) < 0)
         {
             std::cerr << "[Packet] Can't send data packet." << endl;
             return GERROR_CANT_SEND_PACKET;
         }
     }
+    
+    // If downsock is null, we return.
+    if(downsock == SOCKET_ERROR)
+        return GERROR_NONE;
     
     // If packet sent is not an answer, we must wait for a correct
     // answer from the socket, wich may be of type PT_RECEIVED_OK
@@ -482,9 +511,9 @@ gerror_t send_client_packet(SOCKET sock, uint8_t packet_type, const void* data, 
         Packet* panswer = nullptr;
         
         if(packet_type == PT_USER_INIT)
-            panswer = receive_client_packet(sock, false);
+            panswer = receive_client_packet(downsock, false);
         else
-            panswer = receive_client_packet(sock);
+            panswer = receive_client_packet(downsock);
         
         if(panswer)
         {
@@ -496,6 +525,10 @@ gerror_t send_client_packet(SOCKET sock, uint8_t packet_type, const void* data, 
             {
                 ret = GERROR_ANSWER_BAD;
             }
+            else if(packet_type == PT_CONNECTIONSTATUS)
+            {
+                ret = GERROR_NONE;
+            }
             else
             {
                 ret = GERROR_ANSWER_INVALID;
@@ -503,6 +536,7 @@ gerror_t send_client_packet(SOCKET sock, uint8_t packet_type, const void* data, 
         }
         else
         {
+            cout << "\na, " << (uint32_t) packet_type << endl;
             ret = GERROR_ANSWER_INVALID;
         }
     }

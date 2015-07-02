@@ -26,10 +26,11 @@
 
 #include "prerequesites.h"
 #include "user.h"
+#include "events.h"
 
 GBEGIN_DECL
 
-struct _client_;
+class Client;
 
 // Defines some operation the clien is currently doing (like his state)
 enum ClientOperation
@@ -44,7 +45,7 @@ enum ClientOperation
 // A special thread structure to defines what we need
 // in the client thread.
 typedef struct __client_thread {
-    struct _client_* owner;// This is the client owner.
+    Client*          owner;// This is the client owner.
     pthread_t        thethread;// This is the current thread object.
     pthread_mutex_t  mutexaccess;// This mutex has to be used when accessing data in this thread.
     
@@ -90,14 +91,15 @@ typedef struct __client_thread {
  *  client_free(&myclient); // Free the client and save its data.
  *  ```
 **/
-typedef struct _client_ {
+class Client : public Emitter {
+public:
     SOCKET          sock;          // socket of the connection.
     std::string     name;          // Name of the origin from the connection.
-    uint32_t       id;            // The connection ID, given by the server.
+    uint32_t        id;            // The connection ID, given by the server.
 
     client_thread_t server_thread; // [Server-side] store the client procesing thread
     SOCKADDR_IN     address;       // [server-side] store the address information.
-    _client_*       mirror;        // [server-side] Mirror client connection.
+    Client*         mirror;        // [server-side] Mirror client connection.
     void*           server;        // [Server-side] Server creating this client.
     buffer_t        pubkey;        // Public Key to decrypt data received.
     bool            established;   // [Server-side] True if connection is established, false otherwise.
@@ -109,7 +111,7 @@ typedef struct _client_ {
     
     bool            idling;        // [Server-side] True if the client thread loop is idling (waiting for a packet).
 
-    _client_ ()
+    Client ()
     {
         sock                        = INVALID_SOCKET;
         name                        = "null";
@@ -131,13 +133,22 @@ typedef struct _client_ {
         idling                      = false;
     }
 
-    bool operator == (const _client_ other) {
+    bool operator == (const Client& other) {
         return sock == other.sock &&
                 name == other.name;
     }
-} client_t;
+    
+    const char* getName() const { return "Client"; }
+    
+};
 
+typedef Client    client_t;
 typedef client_t* clientptr_t;
+
+class ClientUserLoggedEvent : public Event {
+public:
+    userptr_t user;
+};
 
 /** @defgroup client_function
  *  @brief Every client-side functions.

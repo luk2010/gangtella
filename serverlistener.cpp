@@ -40,6 +40,10 @@ void ServerListener::handle(const Event *e)
         onClientCompleted(reinterpret_cast<const ServerClientCompletedEvent*>(e));
     else if(e->type == "ServerHttpRequestEvent")
         onHttpRequest(reinterpret_cast<const ServerHttpRequestEvent*>(e));
+    else if(e->type == "ServerClientClosingEvent")
+        onClientClosing(reinterpret_cast<const ServerClientClosingEvent*>(e));
+    else if(e->type == "ServerClientClosedEvent")
+        onClientClosed(reinterpret_cast<const ServerClientClosedEvent*>(e));
     
     else {
         gnotifiate_warn("Not handled event type '%s'.", e->type.c_str());

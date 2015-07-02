@@ -74,9 +74,9 @@
 #define _PANIC_ON_ERROR
 
 #ifdef _DEBUG
-#define GVERSION_BUILD "15d"
+#define GVERSION_BUILD "16d"
 #else
-#define GVERSION_BUILD "15"
+#define GVERSION_BUILD "16"
 #endif // _DEBUG
 
 #define GANGTELLA_VERSION GVERSION_MAJ "." GVERSION_MIN "." GVERSION_BUILD

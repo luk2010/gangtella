@@ -149,7 +149,7 @@ void* server_client_thread_loop(void* data)
                         cout << "[Server]{" << client->name << "} User '" << user->name << "' is already in your"
                         << " database, but with another key. Please tell user not to change his key, or he is"
                         << " an usurpator." << endl;
-                        org->client_send(client->mirror, PT_USER_INIT_AEXIST, NULL, 0);
+                        org->client_send(client, PT_USER_INIT_AEXIST, NULL, 0);
                     }
                     
                     else
@@ -163,7 +163,7 @@ void* server_client_thread_loop(void* data)
                         strcpy(uinit.name, globalsession.user->m_name->buf);
                         strcpy(uinit.key,  globalsession.user->m_key->buf);
                         strcpy(uinit.iv,   globalsession.user->m_iv->buf);
-                        org->client_send(client->mirror, PT_USER_INIT_RESPONSE, &uinit, sizeof(uinit));
+                        org->client_send(client, PT_USER_INIT_RESPONSE, &uinit, sizeof(uinit));
                         
                         /*strcpy(client->logged_user->m_name->buf, uip->data.name);
                         strcpy(client->logged_user->m_key->buf, uip->data.key);
@@ -176,6 +176,13 @@ void* server_client_thread_loop(void* data)
                         client->logged            = true;
                         
                         cout << "[Server]{" << client->name << "} User '" << uip->data.name << "' accepted." << endl;
+                        
+                        ClientUserLoggedEvent* e = new ClientUserLoggedEvent;
+                        e->type   = "ClientUserLoggedEvent";
+                        e->parent = client;
+                        e->user   = client->logged_user;
+                        client->sendEvent(e);
+                        delete e;
                     }
                     
                 }
@@ -201,7 +208,7 @@ void* server_client_thread_loop(void* data)
                         strcpy(uinit.name, globalsession.user->m_name->buf);
                         strcpy(uinit.key,  globalsession.user->m_key->buf);
                         strcpy(uinit.iv,   globalsession.user->m_iv->buf);
-                        org->client_send(client->mirror, PT_USER_INIT_RESPONSE, &uinit, sizeof(uinit));
+                        org->client_send(client, PT_USER_INIT_RESPONSE, &uinit, sizeof(uinit));
                         
                         /* strbufcreateandcopy(client->logged_user->name, client->logged_user->lname,
                                             uip->data.name, strlen(uip->data.name));
@@ -221,7 +228,7 @@ void* server_client_thread_loop(void* data)
                     else
                     {
                         // User didn't accept the connection, just discard it.
-                        org->client_send(client->mirror, PT_USER_INIT_NOTACCEPTED, nullptr, 0);
+                        org->client_send(client, PT_USER_INIT_NOTACCEPTED, nullptr, 0);
                         cout << "[Server]{" << client->name << "} User '" << uip->data.name << "' not accepted." << endl;
                     }
                 }
@@ -231,7 +238,7 @@ void* server_client_thread_loop(void* data)
             {
                 // If this server is not logged in, we should send the client a packet to
                 // end the user initialization.
-                org->client_send(client->mirror, PT_USER_INIT_NOTLOGGED, nullptr, 0);
+                org->client_send(client, PT_USER_INIT_NOTLOGGED, nullptr, 0);
                 
                 cout << "[Server]{" << client->name << "} User '" << uip->data.name << "' tried to logged in to you but"
                 << " you are not logged in. Please log in." << endl;
@@ -302,7 +309,7 @@ void* server_client_thread_loop(void* data)
             client->logged = false;
             
             // Now we send the PT_USER_END_RESPONSE packet to notifiate the server to unlog from us too.
-            org->client_send(client->mirror, PT_USER_END_RESPONSE, NULL, 0);
+            org->client_send(client, PT_USER_END_RESPONSE, NULL, 0);
             delete pclient;
         }
         

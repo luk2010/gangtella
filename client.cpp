@@ -184,7 +184,9 @@ gerror_t client_create(client_t* client, const char* adress, size_t port)
 **/
 gerror_t client_send_packet(client_t* client, uint8_t packet_type, const void* data, size_t sz)
 {
-    return send_client_packet(client->sock, packet_type, data, sz);
+    SOCKET downsock = client->sock;
+    SOCKET upsock = client->mirror ? client->mirror->sock : SOCKET_ERROR;
+    return send_client_packet(upsock, downsock, packet_type, data, sz);
 }
 
 /** @brief Close a client connection.

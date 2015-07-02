@@ -80,7 +80,7 @@ void treat_command(const std::string& command)
                     client_t* to = &(server.clients[i]);
                     if(to != NULL && to->mirror != NULL)
                     {
-                        client_send_packet(to->mirror, PT_CLIENT_MESSAGE, command.c_str() + 11, command.size() - 11);
+                        client_send_packet(to, PT_CLIENT_MESSAGE, command.c_str() + 11, command.size() - 11);
                     }
                 }
             }
@@ -214,7 +214,7 @@ void display_help()
     << " --help        : Show this text."                                   << endl; cout
     << " --usr-help    : Show a help text on how to connect to the Network."<< endl; cout
     << " --version     : Show the version number."                          << endl; cout
-    << " --test-unit-a : Launch the program as Test Unit A (s-port=8378, dbname=a," << endl; cout
+    << " --test-unit-a : Launch the program as Test Unit A (s-port=8888, dbname=a," << endl; cout
     << "                 dbpass=a, s-name=a, username=a, userpass=a, log=a.log)" << endl; cout
     << " --test-unit-b : Launch the program as Test Unit B (s-port=7777, dbname=b," << endl; cout
     << "                 dbpass=b, s-name=b, username=b, userpass=b, log=b.log)" << endl;
@@ -242,6 +242,12 @@ public:
     }
     void onServerStopped(const ServerStoppedEvent* e) {
         gnotifiate_info("[TestServerListener] Server stopped !");
+    }
+    void onClientCompleted(const ServerClientCompletedEvent* e) {
+        gnotifiate_info("[TestServerListener] Client '%s' completed !", e->client->name.c_str());
+    }
+    void onClientClosed(const ServerClientClosedEvent* e) {
+        gnotifiate_info("[TestServerListener] Client '%s' closed !", e->client->name.c_str());
     }
 };
 
@@ -341,7 +347,7 @@ int main(int argc, char* argv[])
         // If we have --test-unit option set, we overwrite every options.
         if(std::string("--test-unit-a") == argv[i])
         {
-            server.args.port = 8378;
+            server.args.port = 8888;
             server.args.name = "A";
             dbname           = "test-unit-a.db";
             ncdbpass         = "a";
@@ -382,13 +388,13 @@ int main(int argc, char* argv[])
 
     if(server.args.withssl) {
         if(encryption_init() != GERROR_NONE) {
-            cout << "[Main] Can't initialize OpenSSl." << endl;
+            gnotifiate_error("[Main] Can't initialize OpenSSl.");
             exit(GERROR_ENCRYPT_NOSSL);
         }
     }
 
     if(server.args.withssl == false) {
-        cout << "[Main] Sorry, uncrypted sessions are not allowed anymore." << endl;
+        gnotifiate_error("[Main] Sorry, uncrypted sessions are not allowed anymore.");
         exit(GERROR_ENCRYPT_NOSSL);
     }
 

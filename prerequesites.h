@@ -74,9 +74,9 @@
 #define _PANIC_ON_ERROR
 
 #ifdef _DEBUG
-#define GVERSION_BUILD "16d"
+#define GVERSION_BUILD "17d"
 #else
-#define GVERSION_BUILD "16"
+#define GVERSION_BUILD "17"
 #endif // _DEBUG
 
 #define GANGTELLA_VERSION GVERSION_MAJ "." GVERSION_MIN "." GVERSION_BUILD
@@ -311,8 +311,9 @@ typedef enum GError
     GERROR_NORECEIVE         = 47,
     GERROR_GCRYPT_BADPOS     = 48,
     GERROR_DB_NOUSER         = 49,
+    GERROR_NOT_INITIALIZED   = 50,
 
-    GERROR_MAX               = 50  // Number of errors
+    GERROR_MAX               = 51  // Number of errors
 } GError;
 typedef int gerror_t;
 
@@ -459,6 +460,20 @@ void gnotifiate(int level, const char* format, ...);
 /** @brief Set the default logging files for given level.
 **/
 void gnotifiate_setloglevelfile(int level, FILE* file);
+
+// Some macros to help mutexes.
+#define DEFINE_MUTEX(name) pthread_mutex_t name ;
+#define INIT_MUTEX(name) name = PTHREAD_MUTEX_INITIALIZER;
+#define LOCK(name) gthread_mutex_lock(name);
+#define UNLOCK(name) gthread_mutex_unlock(name);
+
+class AutoMutex {
+public:
+    AutoMutex(pthread_mutex_t* m) : _m(m) { LOCK(_m); }
+    ~AutoMutex() { UNLOCK(_m); }
+private:
+    pthread_mutex_t* _m;
+};
 
 GEND_DECL
 

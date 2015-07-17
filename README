@@ -1,16 +1,15 @@
 The GangTella Project
 ---------------------
 
-Copyright @luk2010, 2014
+Copyright @luk2010, 2014 - 2015
+Current build : 0.1.16
 
-The GangTella project is a new type of connection, where every connection
-have a mirror which pointes directly to the client. These connections are secure, 
-and relatively fast. 
-It uses the TCP/IP protocol and it creates a higher level protocol with packets. 
-Serialization is handled by a minimal code. 
+GangTella Project is an attempt to build a network based on double connection, i.e. where each clients allocates 2 one-way channels. 
+Each connection is secured by two ways : 
+- A session-based encryption with public and private key to identify clients. 
+- A database encrypted with our random encryption script, gCrypt.
 
-This project can be used to chat with people you like without using any messenger 
-or full-of-popup things, you can share files without needing something special.
+The database is the key of the network : it represents you and every clients you trust, with their known address. As every connection is encrypted, and no critical informations are stored, there are no problems with stocking IP adresses as they can be used by any user, and so can not be used to identify one particular user.
 
 Currently supported platforms : 
 * Windows XP/Vista/7/8
@@ -22,5 +21,5 @@ Currently supported platforms :
 Libraries needed :
 * pthread
 * libcrypto (OpenSSL)
-* A correct socket implementation (posix or WSA) 
+* A correct socket implementation (posix or WSA are currently supported). 
 

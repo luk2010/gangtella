@@ -217,7 +217,9 @@ void display_help()
     << " --test-unit-a : Launch the program as Test Unit A (s-port=8888, dbname=a," << endl; cout
     << "                 dbpass=a, s-name=a, username=a, userpass=a, log=a.log)" << endl; cout
     << " --test-unit-b : Launch the program as Test Unit B (s-port=7777, dbname=b," << endl; cout
-    << "                 dbpass=b, s-name=b, username=b, userpass=b, log=b.log)" << endl;
+    << "                 dbpass=b, s-name=b, username=b, userpass=b, log=b.log)" << endl; cout
+    << " --test-unit-c : Launch the program as Test Unit C (s-port=9999, dbname=c," << endl; cout
+    << "                 dbpass=c, s-name=c, username=c, userpass=c, log=c.log)" << endl;
 
 }
 
@@ -269,6 +271,8 @@ int main(int argc, char* argv[])
     FILE* loginfo = nullptr;
     FILE* logwarn = nullptr;
     FILE* logerr  = nullptr;
+    
+    bool showVersionAndReturn = false;
 
     for(int i = 0; i < argc; ++i)
     {
@@ -304,7 +308,7 @@ int main(int argc, char* argv[])
         }
         else if(std::string("--version") == argv[i])
         {
-            return 0;
+            showVersionAndReturn = true;
         }
         else if(std::string("--no-ssl") == argv[i])
         {
@@ -371,6 +375,19 @@ int main(int argc, char* argv[])
             logwarn = fopen("b.warn.log", "w");
             logerr  = fopen("b.err.log", "w");
         }
+        else if(std::string("--test-unit-c") == argv[i])
+        {
+            server.args.port = 9999;
+            server.args.name = "C";
+            dbname           = "test-unit-c.db";
+            ncdbpass         = "c";
+            username         = "c";
+            ncuserpass       = "c";
+            
+            loginfo = fopen("c.info.log", "w");
+            logwarn = fopen("c.warn.log", "w");
+            logerr  = fopen("c.err.log", "w");
+        }
     }
     
     // Set the logging files.
@@ -379,6 +396,7 @@ int main(int argc, char* argv[])
     gnotifiate_setloglevelfile(3, loginfo ? loginfo : stdout);
     
     gnotifiate_info("GangTella v.%s.", GANGTELLA_VERSION);
+    if(showVersionAndReturn) return EXIT_SUCCESS;
     
     // Register our listener.
     TestServerListener* tsl = new TestServerListener;

@@ -43,7 +43,7 @@ gerror_t gcrypt(std::string in, std::string& out, const std::string& password)
     out.push_back(tmplen[3]);
     
 #ifdef GULTRA_DEBUG
-    gnotifiate_warn("[gcrypt] Total lenght = %i.", in.length());
+    gnotifiate_info("[gcrypt] Total lenght = %i.", in.length());
 #endif
     
     std::vector<uint32_t> passthrought;
@@ -74,7 +74,7 @@ gerror_t gcrypt(std::string in, std::string& out, const std::string& password)
             char cret = cin + cpass;
             
 #ifdef GULTRA_DEBUG
-            gnotifiate_warn("[gcrypt] Coding position '%i'. (%i)", (uint32_t) curin, (uint32_t) cret);
+            gnotifiate_info("[gcrypt] Coding position '%i'. (%i)", (uint32_t) curin, (uint32_t) cret);
 #endif
             
             // Adding all this shit in the out string
@@ -94,7 +94,7 @@ gerror_t gcrypt(std::string in, std::string& out, const std::string& password)
             char cret = cin + cpass;
             
 #ifdef GULTRA_DEBUG
-            gnotifiate_warn("[gcrypt] Coding position '%i'. (%i)", (uint32_t) curin, (uint32_t) cret);
+            gnotifiate_info("[gcrypt] Coding position '%i'. (%i)", (uint32_t) curin, (uint32_t) cret);
 #endif
             
             // Adding all this shit in the out string
@@ -112,7 +112,7 @@ gerror_t gcrypt(std::string in, std::string& out, const std::string& password)
             char cret = cin + cpass;
             
 #ifdef GULTRA_DEBUG
-            gnotifiate_warn("[gcrypt] Coding position '%i'. (%i)[opcode=0x%08.8X]", (uint32_t) curin, (uint32_t) cret, (uint32_t) pos);
+            gnotifiate_info("[gcrypt] Coding position '%i'. (%i)[opcode=0x%08.8X]", (uint32_t) curin, (uint32_t) cret, (uint32_t) pos);
 #endif
             
             // Adding all this shit in the out string
@@ -144,7 +144,7 @@ gerror_t guncrypt(std::string in, std::string& out, const std::string& password)
     totlen = deserialize<uint32_t>(totlen);
     
 #ifdef GULTRA_DEBUG
-    gnotifiate_warn("[guncrypt] Total lenght = '%i'.", totlen);
+    gnotifiate_info("[guncrypt] Total lenght = '%i'.", totlen);
 #endif
     
     cursor += sizeof(uint32_t);
@@ -210,7 +210,7 @@ gerror_t guncrypt(std::string in, std::string& out, const std::string& password)
         ccode = ccode - password[curpass];
         
 #ifdef GULTRA_DEBUG
-        gnotifiate_warn("[guncrypt] Next position = %i. (%i)", nextpos, (uint32_t) ccode);
+        gnotifiate_info("[guncrypt] Next position = %i. (%i)", nextpos, (uint32_t) ccode);
 #endif
         
         out.replace(nextpos, 1, 1, ccode);

@@ -227,7 +227,8 @@ static const char* __errors [GERROR_MAX] = {
     "No user password provided.",
     "No packets have been received.",
     "(GCrypt) Bad Position token in file.",
-    "No BT_USER block before BT_CLIENT block."
+    "No BT_USER block before BT_CLIENT block.",
+    "A structure or an object has not been initialized."
 };
 
 const char* gerror_to_string(GError err)
@@ -598,19 +599,31 @@ void gnotifiate (int level, const char* format, ...)
     va_list args;
     FILE* log_file = level == 1 ? _fileError : level == 2 ? _fileWarn : _fileInfo;
     
-    gthread_mutex_lock(&__console_mutex);
+    // Compute the date.
+    time_t rawtime;
+    struct tm * timeinfo;
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
     
-    va_start(args, format);
-    vfprintf(log_file, format, args);
-    fprintf(log_file, "\n");
-    va_end(args);
+    char buffer[80];
+    strftime(buffer, 80, "%H:%M:%S", timeinfo);
     
+    //gthread_mutex_lock(&__console_mutex);
+    {
+        fprintf(log_file, "|%s| ", buffer);
+        
+        va_start(args, format);
+        vfprintf(log_file, format, args);
+        va_end(args);
+        
+        fprintf(log_file, "\n");
+        
 #if GULTRA_DEBUG
-    fflush(log_file);
-    fsync(fileno(log_file));
+        fflush(log_file);
+        fsync(fileno(log_file));
 #endif
-    
-    gthread_mutex_unlock(&__console_mutex);
+    }
+    //gthread_mutex_unlock(&__console_mutex);
 }
 
 void gnotifiate_setloglevelfile(int level, FILE* file)

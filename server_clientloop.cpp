@@ -50,7 +50,9 @@ void* server_client_thread_loop(void* data)
         {
             // Client send PT_CLOSING_CONNECTION if it wants this server to destroy the client object.
             // We close the socket, destroy the client but don't send any packet.
-            
+            cout << "[Server]{client} Destroying client." << endl;
+            cout << "[Server]{client} Destroying client." << endl;
+            cout << "[Server]{client} Destroying client." << endl;
             uint32_t cid = ID_CLIENT_INVALID;
             if(client->mirror != NULL)
             {

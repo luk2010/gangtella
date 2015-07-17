@@ -203,7 +203,7 @@ Packet* receive_client_packet(SOCKET sock, SOCKET retsock, bool timedout, uint32
         memcpy(retv->request, (char*) max_request, n);
 
 #ifdef GULTRA_DEBUG
-        cout << "[Packet] HTTP Request size = " << n << endl;
+        gnotifiate_info("[Packet] HTTP Request size = %i .", n);
 #endif // GULTRA_DEBUG
 
         // Return it
@@ -214,7 +214,9 @@ Packet* receive_client_packet(SOCKET sock, SOCKET retsock, bool timedout, uint32
     // If packet is a PT_CONNECTION_STATUS, directly send an answer back.
     if(ptp.type == PT_CONNECTIONSTATUS)
     {
-        cout << "[receive_packet] Received Connection status. Sending OK. " << endl;
+#ifdef GULTRA_DEBUG
+        gnotifiate_info("[receive_packet] Received Connection status. Sending OK.");
+#endif
         send_client_packet(retsock, SOCKET_ERROR, PT_RECEIVED_OK, nullptr, 0);
         return packet_choose_policy(PT_CONNECTIONSTATUS);
     }
@@ -253,7 +255,7 @@ Packet* receive_client_packet(SOCKET sock, SOCKET retsock, bool timedout, uint32
             
             // Show the error
 #ifdef GULTRA_DEBUG
-            cout << "[Packet] Can't interpret packet : " << gerror_to_string(err) << endl;
+            gnotifiate_warn("[Packet] Can't interpret packet : %s", gerror_to_string(err));
 #endif // GULTRA_DEBUG
         }
         
@@ -318,7 +320,7 @@ gerror_t packet_interpret(const uint8_t type, Packet* packet, data_t* data, size
     
     if(type >= PT_MAX)
     {
-        cout << "[Packet] Unknown packet type received : '" << (uint32_t) type << "'." << endl;
+        gnotifiate_warn("[Packet] Unknown packet type received : '%i'.", (uint32_t) type);
         return GERROR_INVALID_PACKET;
     }
     
@@ -404,7 +406,7 @@ gerror_t packet_wait(SOCKET sock, SOCKET retsock, PacketPtr& retpacket)
     
     while (!retpacket)
     {
-        cout << "[packet_wait] Waiting for packet." << endl;
+        gnotifiate_info("[packet_wait] Waiting for packet.");
         // First we wait 3 seconds for a packet to come.
         retpacket = receive_client_packet(sock, retsock);
         
@@ -416,14 +418,14 @@ gerror_t packet_wait(SOCKET sock, SOCKET retsock, PacketPtr& retpacket)
         
         else
         {
-            cout << "[packet_wait] Sending connection status. " << endl;
+            gnotifiate_info("[packet_wait] Sending connection status.");
             // If nothing has been received, just send a connection status packet
             // to check connection with the socket.
             gerror_t err = send_client_packet(retsock, sock, PT_CONNECTIONSTATUS, nullptr, 0);
             if(err != GERROR_NONE)
             {
 #ifdef GULTRA_DEBUG
-                cout << "[Packet] Error sending connection status : " << gerror_to_string(err) << endl;
+                gnotifiate_warn("[Packet] Error sending connection status : %s ", gerror_to_string(err));
 #endif
                 // If we can't have any answer, return the error.
                 return err;
@@ -432,7 +434,7 @@ gerror_t packet_wait(SOCKET sock, SOCKET retsock, PacketPtr& retpacket)
             {
                 // In debug mode, notifiate we send correctly the checking status.
 #ifdef GULTRA_DEBUG
-                cout << "[Packet] Checked connection status with SOCK '" << sock << "' OK." << endl;
+                gnotifiate_info("[Packet] Checked connection status with SOCK '%i' OK.", (int32_t) sock);
 #endif
             }
         }
@@ -453,7 +455,7 @@ gerror_t packet_wait(SOCKET sock, SOCKET retsock, PacketPtr& retpacket)
  *  of the buffer.
  *
  *  @param upsock      : Socket to send the packet.
- *  @param downsock     : Socket to receive the PT_RECEIVED_OK or PT_RECEIVED_BAD
+ *  @param downsock    : Socket to receive the PT_RECEIVED_OK or PT_RECEIVED_BAD
  *                       answers. If SOCKET_ERROR, no receiving packets will be asked.
  *  @param packet_type : Type of the packet to send.
  *  @param data        : Data to send, corresponding to the exact byte pattern
@@ -472,12 +474,14 @@ gerror_t send_client_packet(SOCKET upsock, SOCKET downsock, uint8_t packet_type,
     if(packet_type == PT_UNKNOWN)
         return GERROR_BADARGS;
 
-    cout << "[send_client_packet] Sending packet type " << (uint32_t) packet_type << endl;
+#ifdef GULTRA_DEBUG
+    gnotifiate_info("[send_client_packet] Sending packet type %i.", (uint32_t) packet_type);
+#endif
     // Send the PT_PACKETTYPE first
     PacketTypePacket ptp(packet_type);
     if(send(upsock, (data_t*) &ptp, ptp.getPacketSize(), 0) < 0)
     {
-        cout << "[Packet] Can't send PT_PACKETTYPE." << endl;
+        gnotifiate_warn("[Packet] Can't send PT_PACKETTYPE.");
         return GERROR_CANT_SEND_PACKET;
     }
 
@@ -486,7 +490,7 @@ gerror_t send_client_packet(SOCKET upsock, SOCKET downsock, uint8_t packet_type,
     {
         if(send(upsock, (data_t*) data, sz, 0) < 0)
         {
-            std::cerr << "[Packet] Can't send data packet." << endl;
+            gnotifiate_error("[Packet] Can't send data packet.");
             return GERROR_CANT_SEND_PACKET;
         }
     }

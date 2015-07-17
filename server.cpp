@@ -42,16 +42,20 @@ public:
         server_access();
         server->_unlogged_clients.push_back(e->client);
         server_stopaccess();
+        
+#ifdef GULTRA_DEBUG
+        gnotifiate_info("[InternalServerListener] New Unregistered client added (IP='%s', port='%i').", e->client->getAddressString().c_str(), e->client->getPort());
+#endif
     }
     
     void onClientCompleted(const ServerClientCompletedEvent* e)
     {
-        Server* server = reinterpret_cast<Server*>(e->parent);
-        // For now, the client is unlogged. So we can register
-        // it to the unlogged clients vector.
-        server_access();
-        server->_unlogged_clients.push_back(e->client);
-        server_stopaccess();
+        // For now, the client is unlogged, but he should already have been
+        // saved to _unlogged_clients list by event ServerNewClientCreatedEvent.
+        
+#ifdef GULTRA_DEBUG
+        gnotifiate_info("[InternalServerListener] Client '%s' has been completed.", e->client->getName());
+#endif
     }
     
 };
@@ -877,24 +881,26 @@ gerror_t server_init_client_connection(server_t* server, client_t*& out, const c
         return GERROR_BADARGS;
     
     server_wait_status(server, SS_STARTED);
+    
+    gnotifiate_info("[Server] Trying to initiate connection to client '&s:%i'...", adress, port);
         
 	// We check if connection does not already exist
     out = server_client_exist(server, adress, port);
     if(out)
     {
-        cout << "[Server] Client ('" << adress << ":" << port << "') already exist (" << out->name << ")." << endl;
+        gnotifiate_error("[Server] Client ('%s:%i') already exist (%s).", adress, port, out->name.c_str());
         return GERROR_NONE;
     }
     
 #ifdef GULTRA_DEBUG
-    cout << "[Server] Creating mirror client." << endl;
+    gnotifiate_info("[Server] Creating mirror client.");
 #endif
 
     // First we create the mirror. It will handle the socket to the client.
     clientptr_t mirror = nullptr;
     if(client_alloc(&mirror, server_generate_new_id(server), nullptr, (void*) server) != GERROR_NONE)
     {
-        cout << "[Server] Can't allocate mirror client ! Aborting creation." << endl;
+        gnotifiate_error("[Server] Can't allocate mirror client ! Aborting creation.");
         return GERROR_ALLOC;
     }
     

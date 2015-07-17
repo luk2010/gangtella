@@ -578,4 +578,26 @@ gerror_t client_thread_setstatus(clientptr_t client, ClientOperation ope)
     return GERROR_NONE;
 }
 
+const std::string Client::getServerName() const
+{
+    return name;
+}
+
+const void* Client::getAddressRawPointer() const
+{
+    return (const void*) &address;
+}
+
+const std::string Client::getAddressString() const
+{
+    char buffer[INET6_ADDRSTRLEN];
+    inet_ntop(address.sin_family, getAddressRawPointer(), buffer, sizeof(buffer));
+    return std::string(buffer);
+}
+
+const uint32_t Client::getPort() const
+{
+    return (uint32_t) ntohs(address.sin_port);
+}
+
 GEND_DECL
